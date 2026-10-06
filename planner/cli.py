@@ -167,7 +167,10 @@ def cmd_solve(a):
             lvs = {r: [lv for _, lv in vv] for r, vv in v.items() if vv}
             print(f'  {k:<8} 电力 供 {s} / 耗 {c:.0f} / 净 {n:+.0f} {"✔" if n >= 0 else "✘"}   等级 {lvs}')
         return
-    obj = a.objective or OBJ.build(a.main, a.gold, a.shard, a.morale)
+    obj = a.objective or OBJ.build(a.main, a.gold, a.shard, a.morale, trust=bool(a.trust))
+    min_eff = {}
+    if a.min_eff_meeting: min_eff['会客室'] = float(a.min_eff_meeting)
+    if a.min_eff_hire: min_eff['人力办公室'] = float(a.min_eff_hire)
     table = None
     if a.shifts:
         from core import shiftplan as SP
@@ -180,7 +183,7 @@ def cmd_solve(a):
     got = run(layout=a.layout, objective=obj, width=a.width, topk=a.topk,
               rounds=a.rounds, days=a.days, fast=a.fast, out_dir=a.out,
               storage=a.storage, shift_hours=a.shift_hours, max_roster=a.max_roster,
-              sched=a.sched, table=table)
+              sched=a.sched, table=table, min_eff=min_eff)
     k = got['kpi']
     print('\n' + '=' * 60)
     print(f"目标：{got['objective']['name']}")
@@ -239,6 +242,12 @@ def main():
                         '结束时间自动取下一班的开始时间（最后一班回到第一班，闭环）。'
                         '例：--shifts "22:00,10:00,16:00" = 第1班 22:00→10:00(12h)、'
                         '第2班 10:00→16:00(6h)、第3班 16:00→22:00(6h)')
+    p.add_argument('--trust', action='store_true',
+                   help='重视信赖：让更多不同干员轮到班（给 kpi["ops_used"] 一个约 2%% 量级的小权重）')
+    p.add_argument('--min-eff-meeting', type=float, default=0.0,
+                   help='会客室最低线索速度（0=不限；达不到就退回全局最优并告警）')
+    p.add_argument('--min-eff-hire', type=float, default=0.0,
+                   help='人力办公室最低刷新效率（0=不限）')
     p.add_argument('--list', action='store_true', help='只列出可用目标与布局')
     p.set_defaults(f=cmd_solve)
     a = ap.parse_args()

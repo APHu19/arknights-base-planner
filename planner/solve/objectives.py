@@ -52,14 +52,21 @@ MORALE_FLOORS = {'none': None, '12': 12.0, '16': 16.0, '20': 20.0}
 
 
 def build(main='lmd', gold='none', shard='none', morale='none',
-          order_override=None, name=None):
-    """组合式构造目标。返回可直接喂给 score()/joint_solve() 的 props"""
+          order_override=None, name=None, trust=False):
+    """组合式构造目标。返回可直接喂给 score()/joint_solve() 的 props
+
+    trust=True → **重视信赖**：给"当天轮到班的干员数"(kpi['ops_used']) 一个**小权重**
+    （主目标量级的 ~2%，实测 45 人 vs 55 人差 ≈ 800 分，足以在候选里选出轮换更广的方案，
+    但不会压过龙门币/玉的收益）。语义：让更多不同干员上过班 → 基建给他们的+信赖更多。
+    """
     if main not in MAINS: raise KeyError(f'未知主目标 {main}：{list(MAINS)}')
     if gold not in GOLD_MODES: raise KeyError(f'未知赤金条件 {gold}：{list(GOLD_MODES)}')
     if shard not in SHARD_MODES: raise KeyError(f'未知碎片条件 {shard}：{list(SHARD_MODES)}')
     scale = MAIN_SCALE.get(main, 45000.0)
     w = dict(MAINS[main]['w'])
     cons = {}
+    if trust:
+        w['ops_used'] = 0.02 * scale / 50.0          # 约 2% 量级的小权重
     for table, key in ((GOLD_MODES, gold), (SHARD_MODES, shard)):
         m = table[key]
         for k, v in m['w'].items():
@@ -69,6 +76,8 @@ def build(main='lmd', gold='none', shard='none', morale='none',
     if fl is not None:
         cons['min_morale'] = (fl, None)
     parts = [MAINS[main]['name'], GOLD_MODES[gold]['name'], SHARD_MODES[shard]['name']]
+    if trust:
+        parts.append('重视信赖（轮换更广）')
     if fl is not None: parts.append(f'心情底线 {fl:g}')
     # 含碎片约束时，必须**先排碎片站再排玉站**：否则玉站先把强干员挑走、碎片不够，
     # 预算修复只能把玉站降级成弱队（实测会从 ~600 玉掉到 240）。

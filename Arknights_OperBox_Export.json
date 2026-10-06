@@ -45,6 +45,15 @@
     "rarity": 6
   },
   {
+    "id": "char_1001_amiya2",
+    "name": "阿米娅",
+    "elite": 0,
+    "level": 0,
+    "own": false,
+    "potential": 0,
+    "rarity": 5
+  },
+  {
     "id": "char_1011_lava2",
     "name": "炎狱炎熔",
     "elite": 1,
@@ -267,6 +276,15 @@
     "level": 1,
     "own": true,
     "potential": 6,
+    "rarity": 5
+  },
+  {
+    "id": "char_1037_amiya3",
+    "name": "阿米娅",
+    "elite": 0,
+    "level": 0,
+    "own": false,
+    "potential": 0,
     "rarity": 5
   },
   {
@@ -851,7 +869,7 @@
     "elite": 1,
     "level": 54,
     "own": true,
-    "potential": 4,
+    "potential": 5,
     "rarity": 5
   },
   {
@@ -1029,7 +1047,7 @@
     "id": "char_2015_dusk",
     "name": "夕",
     "elite": 1,
-    "level": 70,
+    "level": 80,
     "own": true,
     "potential": 1,
     "rarity": 6
@@ -1292,7 +1310,7 @@
     "elite": 0,
     "level": 1,
     "own": true,
-    "potential": 4,
+    "potential": 6,
     "rarity": 5
   },
   {
@@ -1371,7 +1389,7 @@
     "id": "char_254_vodfox",
     "name": "巫恋",
     "elite": 2,
-    "level": 30,
+    "level": 50,
     "own": true,
     "potential": 4,
     "rarity": 5
@@ -2289,7 +2307,7 @@
     "id": "char_4046_ebnhlz",
     "name": "黑键",
     "elite": 2,
-    "level": 1,
+    "level": 60,
     "own": true,
     "potential": 1,
     "rarity": 6
@@ -2486,7 +2504,7 @@
   {
     "id": "char_4081_warmy",
     "name": "温米",
-    "elite": 0,
+    "elite": 2,
     "level": 1,
     "own": true,
     "potential": 6,
@@ -2612,8 +2630,8 @@
   {
     "id": "char_4109_baslin",
     "name": "深律",
-    "elite": 1,
-    "level": 70,
+    "elite": 2,
+    "level": 1,
     "own": true,
     "potential": 6,
     "rarity": 5
@@ -2867,7 +2885,7 @@
     "elite": 2,
     "level": 60,
     "own": true,
-    "potential": 2,
+    "potential": 1,
     "rarity": 6
   },
   {
@@ -3234,9 +3252,9 @@
     "id": "char_4214_cairn",
     "name": "响石",
     "elite": 0,
-    "level": 0,
-    "own": false,
-    "potential": 0,
+    "level": 1,
+    "own": true,
+    "potential": 1,
     "rarity": 5
   },
   {
@@ -3254,7 +3272,7 @@
     "elite": 2,
     "level": 90,
     "own": true,
-    "potential": 2,
+    "potential": 3,
     "rarity": 6
   },
   {
@@ -3290,7 +3308,7 @@
     "elite": 0,
     "level": 30,
     "own": true,
-    "potential": 1,
+    "potential": 6,
     "rarity": 1
   },
   {
@@ -3387,7 +3405,7 @@
     "id": "char_4230_mcnist",
     "name": "机械师",
     "elite": 2,
-    "level": 89,
+    "level": 90,
     "own": true,
     "potential": 6,
     "rarity": 6
@@ -3542,7 +3560,7 @@
     "elite": 2,
     "level": 90,
     "own": true,
-    "potential": 1,
+    "potential": 2,
     "rarity": 6
   },
   {
@@ -3647,8 +3665,8 @@
   {
     "id": "char_473_mberry",
     "name": "桑葚",
-    "elite": 1,
-    "level": 70,
+    "elite": 2,
+    "level": 1,
     "own": true,
     "potential": 6,
     "rarity": 5
@@ -3785,7 +3803,7 @@
     "elite": 1,
     "level": 1,
     "own": true,
-    "potential": 4,
+    "potential": 1,
     "rarity": 5
   },
   {

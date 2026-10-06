@@ -453,6 +453,10 @@ def simulate_shifts(shifts, days=14, hours=4.0, ds=None):
     kpi['min_morale'] = min(lows.values()) if lows else 0.0
     kpi['min_who'] = min(lows, key=lambda o: lows[o]) if lows else ''
     kpi['lows'] = lows
+    # 信赖向指标：**当天真正轮到班的干员数**（轮换越广，基建给的+信赖越多）。
+    # 只统计"上过班"的人，不含只躺寝室的人。
+    worked = {o for s in shifts for (_r, _p, _l, ops) in s['rooms'] for o in ops}
+    kpi['ops_used'] = float(len(worked))
     # 会客室线索产出（126% 基础 + 干员稀有度/精英化/未红脸 + 后勤技能%，见 core/meeting.py）
     try:
         from .meeting import clue_per_day as _cpd

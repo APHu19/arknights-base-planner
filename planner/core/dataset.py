@@ -195,18 +195,33 @@ class Dataset:
 
 
 def load_box(path=None):
-    """读取干员池（MAA 导出）。返回 {名字: {own, elite, potential}}"""
+    """读取干员池（MAA 导出）。返回 {名字: {own, elite, potential}}
+
+    **重名去重（重要，踩过）**：MAA 导出里"阿米娅"有三条 ——
+    `char_002_amiya`（持有、精2）与 `char_1001_amiya2` / `char_1037_amiya3`（阿米娅近卫/术师，未持有）。
+    朴素的 `out[o['name']] = …` 会让**后面的未持有条目覆盖真正持有的那条**，
+    于是 阿米娅 被当成"未持有/精0"：GUI 显示未持有、MAA 校验报 `未持有干员 ['阿米娅']`、
+    求解器候选池也跟着少人。合并规则：**持有优先 → 精英化高优先 → char_ 前缀优先**。
+    """
     p = path or os.path.join(ROOT, 'Arknights_OperBox_Export.json')
     box = json.load(open(p, encoding='utf-8-sig'))
     if isinstance(box, dict):
         for v in box.values():
-            if isinstance(v, list): box = v; break
-    out = {}
+            if isinstance(v, list):
+                box = v
+                break
+    best = {}
     for o in box:
-        if not o.get('name'): continue
-        out[o['name']] = dict(own=bool(o.get('own', 1)), elite=int(o.get('elite', 0) or 0),
-                              potential=int(o.get('potential', 0) or 0))
-    return out
+        if not isinstance(o, dict) or not o.get('name'):
+            continue
+        name = o['name']
+        rec = dict(own=bool(o.get('own', 1)), elite=int(o.get('elite', 0) or 0),
+                   potential=int(o.get('potential', 0) or 0))
+        oid = str(o.get('id') or '')
+        key = (rec['own'], rec['elite'], oid.startswith('char_'), oid)
+        if name not in best or key > best[name][0]:
+            best[name] = (key, rec)
+    return {n: rec for n, (_k, rec) in best.items()}
 
 
 if __name__ == '__main__':

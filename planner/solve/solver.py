@@ -58,10 +58,31 @@ def check_power(layout, fixed=None, dorm_power=0, other_consume=None):
     return supply, consume, supply - consume
 
 
-def try_presets(cfg, objective, ds, box, base_assign, ctx, hours=12.0):
-    """在给定装配上试各种固定房间组合，用**快照目标**选最优，返回 (fixed, score)"""
+def room_eff(room, team, ctx, ds, level=3, product=None, hours=4.0):
+    """房间效率%（会客室=线索速度口径，其余房间=规则表 eff）——给"最低效率要求"用。"""
+    from core.engine import eval_room as _ev
+    if room == '会客室':
+        try:
+            from core.meeting import speed
+            return float(speed(list(team), ds, box=getattr(ds, '_box', None),
+                               hours=hours).get('speed') or 0.0)
+        except Exception:
+            pass
+    try:
+        return float(_ev(room, level, product, list(team), ctx, ds, hours=hours).get('eff') or 0.0)
+    except Exception:
+        return 0.0
+
+
+def try_presets(cfg, objective, ds, box, base_assign, ctx, hours=12.0, min_eff=None):
+    """在给定装配上试各种固定房间组合，用**快照目标**选最优，返回 (fixed, score)。
+
+    min_eff：{'会客室': 200, '人力办公室': 30, …} —— **最低效率要求**，达不到的组合直接跳过；
+    若所有组合都达不到，则退回"全局最优"并在返回的快照里标记 `min_eff_miss`（如实告知，不假装达标）。
+    """
     props = objectives.get(objective) if isinstance(objective, str) else objective
-    best = None
+    min_eff = {k: float(v or 0) for k, v in (min_eff or {}).items() if float(v or 0) > 0}
+    best = best_any = None
     for office in PRESETS['人力办公室']:
         for meet in PRESETS['会客室']:
             for work in PRESETS['加工站']:
@@ -71,8 +92,21 @@ def try_presets(cfg, objective, ds, box, base_assign, ctx, hours=12.0):
                 rebuild_ctx(c2, fixed, base_assign)
                 k = fast_kpi(base_assign, fixed, c2, ds, hours)
                 v = objectives.score(k, props)
+                if best_any is None or v > best_any[0]:
+                    best_any = (v, fixed, k)
+                if min_eff:
+                    effs = {r: room_eff(r, fixed.get(r) or [], c2, ds, hours=hours)
+                            for r in min_eff}
+                    miss = {r: (effs[r], min_eff[r]) for r in min_eff if effs[r] < min_eff[r]}
+                    if miss:
+                        continue
+                    k = dict(k); k['min_eff_ok'] = effs
                 if best is None or v > best[0]:
                     best = (v, fixed, k)
+    if best is None:                       # 没有组合达标 → 退回最优并标记
+        best = (best_any[0], best_any[1], dict(best_any[2]))
+        best[2]['min_eff_miss'] = {r: round(room_eff(r, best[1].get(r) or [], ctx, ds, hours=hours), 1)
+                                   for r in min_eff}
     return best[1], best[2]
 
 
@@ -108,7 +142,7 @@ def _compact_roster(assign, fixed, target=50):
 
 def run(layout='333', objective='lmd_gold_bal', ds=None, box=None, width=16, topk=8,
         rounds=2, days=14, fast=False, refine=True, verbose=True, out_dir=None,
-        storage='warn', shift_hours=4.0, max_roster=50, sched='ab', table=None):
+        storage='warn', shift_hours=4.0, max_roster=50, sched='ab', table=None, min_eff=None):
     ds = ds or Dataset(); box = box if box is not None else load_box()
     ds.set_box(box)          # 让 skills_of 按精英化阶段过滤（明椒 E0 无 裁缝·β 等）
     if sched == 'window' and not table and abs(float(shift_hours) - 4.0) > 1e-6:
@@ -137,10 +171,17 @@ def run(layout='333', objective='lmd_gold_bal', ds=None, box=None, width=16, top
         print(f'[2/5] 基准装配完成（{time.time()-t0:.0f}s）：'
               f"龙门币 {r0['kpi'].get('lmd',0):,.0f} 净产金 {r0['kpi'].get('gold_net',0):+.2f}")
     # 试固定房间组合
-    fixed, k_fixed = try_presets(cfg, props, ds, box, r0['assign'], r0['ctx'])
+    fixed, k_fixed = try_presets(cfg, props, ds, box, r0['assign'], r0['ctx'], min_eff=min_eff)
     if verbose:
         print(f"[3/5] 固定房间选定：办公={fixed.get('人力办公室')} 会客={fixed.get('会客室')} "
               f"加工={fixed.get('加工站')}")
+        if min_eff:
+            effs = {r: round(room_eff(r, fixed.get(r) or [], r0['ctx'], ds), 1) for r in min_eff}
+            miss = (k_fixed or {}).get('min_eff_miss')
+            if miss:
+                print(f'      ⚠ 最低效率要求无法满足（实测 {effs}）→ 已退回全局最优，请降低门槛或换干员')
+            else:
+                print(f"      最低效率要求：{ {k: v for k, v in effs.items()} } ✔")
     if refine:
         from solve.joint import _solve_once
         r = _solve_once(cfg, props, ds, box, width, topk, rounds, 12.0, not fast, price=None)
