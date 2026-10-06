@@ -3,6 +3,7 @@
 import collections
 from core.engine import Ctx, simulate_shifts, drain_of, dorm_rooms_recovery, MAX_MORALE
 from core.dataset import Dataset, load_box
+from solve import schedule as SCN
 
 # 控制中枢 A/B 两组与第 6 班轮休替补
 CTRL_A = ['阿米娅', '凯尔希', '令', '重岳', '维什戴尔']
@@ -26,6 +27,61 @@ def _partner(room, ops):
     """给定房间与 A 班组，返回 B 班轮换搭档"""
     table = ROTATION.get(room) or {}
     return list(table.get(tuple(ops), []))
+
+
+# ---------------------------------------------------------------- window 路径（干员级窗口排班）
+def _ctrl_pool():
+    """控制中枢候选集：保 KPI 的元老（A/B 两组）+ 轮休替补，全部是求解器算过的已知好人。"""
+    pool = list(CTRL_A)
+    for o in CTRL_B + list(SUB3.values()) + list(SUB6.values()):
+        if o not in pool:
+            pool.append(o)
+    return pool
+
+
+def _fixed_pools():
+    """固定房间（会客室/人力办公室/加工站）的可用替补：固定队 + 所有轮换搭档。"""
+    out = {}
+    for room, table in ROTATION.items():
+        ops = set(train for pair in table for train in pair)
+        for v in table.values():
+            ops |= set(v)
+        out[room] = sorted(ops)
+    return out
+
+
+def build_window_shifts(assign, fixed, ds=None, hours=4.0, policy='steady', park_leads=0):
+    """window 路径：把装配结果排成对**判据 A（长期稳态）**可行的一天。
+
+    与 ab 路径的区别：不再用"A 组/B 组整段轮换 + 恢复债分寝室"，
+    而是按**真实时间区间**逐个 (房间,区间) 用增量可行性判定选人（见 solve/schedule.py）。
+    返回 (shifts, DayState, 排班结果)
+
+    park_leads：常驻宿舍的恢复技干员人数。**默认 0**——他们只吃床位名额、不为生产出力，
+    而本布局的算术已经卡满：6 班 × 36 人在岗 = 216 岗位，每人最多 4 班（16h，8h 休息才够稳态），
+    ⇒ 需要 54 人，而在册上限 = 20 床 + 36 在岗 = 56。多停一个恢复干员就少一个能排班的人。
+    """
+    from solve import schedule as SCN
+    ds = ds or Dataset()
+    box = load_box()
+    owned = sorted(n for n, v in box.items() if v.get('own', True))
+    spec = SCN.build_spec(assign, fixed, ctrl_pool=_ctrl_pool(), fixed_pools=_fixed_pools(),
+                          ctrl_need=len(CTRL_A), fallback=owned)
+    n_shifts = max(1, int(round(24.0 / float(hours or 4.0))))
+    onduty = sum(int(it['need']) for it in spec)
+    used = {o for it in spec for o in it['primary']}
+    parked = []
+    if park_leads:
+        parked = [o for _b, o in SCN.dorm_leads(ds, [n for n in owned if n not in used])][:int(park_leads)]
+    st = SCN.DayState([hours] * n_shifts, ds=ds, policy=policy, parked=parked,
+                      targets={i: onduty for i in range(n_shifts)})
+    res = SCN.schedule_base(st, spec)
+    SCN.pack_dorms(st, ds, leads=parked)
+    res['parked'] = parked
+    res['spec'] = spec
+    res['roster'] = len(st.roster())
+    res['onduty'] = onduty
+    return SCN.to_shifts(st), st, res
 
 
 def build_shifts(assign, fixed, ds=None, hours=4.0):
@@ -128,10 +184,15 @@ def solve_dorms(shifts, ds, days=21, off_cap=20, allow_swaps=None, hours=4.0):
     return shifts, mor, dict(lows)
 
 
-def build_plan(assign, fixed, ds=None, days=14, objective=None, hours=4.0):
+def build_plan(assign, fixed, ds=None, days=14, objective=None, hours=4.0, sched='ab'):
+    """sched='ab'（默认，现状）：A/B 六班 + 恢复债寝室；sched='window'：干员级窗口排班（判据 A）。"""
     ds = ds or Dataset()
-    shifts = build_shifts(assign, fixed, ds, hours=hours)
-    shifts, mor, lows = solve_dorms(shifts, ds, hours=hours)
+    window = wres = daycheck = None
+    if sched == 'window':
+        shifts, window, wres = build_window_shifts(assign, fixed, ds, hours=hours)
+    else:
+        shifts = build_shifts(assign, fixed, ds, hours=hours)
+        shifts, mor, lows = solve_dorms(shifts, ds, hours=hours)
     kpi = simulate_shifts(shifts, days=days, hours=hours, ds=ds)
     detail = {}
     if objective:
@@ -151,4 +212,10 @@ def build_plan(assign, fixed, ds=None, days=14, objective=None, hours=4.0):
         for sh, s in enumerate(shifts):
             t = targets[sh] if sh < len(targets) else None
             s['drones'] = ({'room': t['maa_room'], 'index': t['index']} if t else None)
-    return dict(shifts=shifts, mor=mor, lows=lows, kpi=kpi, drone_detail=detail)
+    if window is not None:
+        rows = {r['op']: r for r in SCN.kernel_rows(window)}
+        mor = {o: r['end'] for o, r in rows.items()}
+        lows = {o: r['low'] for o, r in rows.items()}
+        daycheck = SCN.verify(window, ds)
+    return dict(shifts=shifts, mor=mor, lows=lows, kpi=kpi, drone_detail=detail,
+                sched=sched, window=window, window_result=wres, daycheck=daycheck)

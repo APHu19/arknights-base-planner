@@ -108,9 +108,12 @@ def _compact_roster(assign, fixed, target=50):
 
 def run(layout='333', objective='lmd_gold_bal', ds=None, box=None, width=16, topk=8,
         rounds=2, days=14, fast=False, refine=True, verbose=True, out_dir=None,
-        storage='warn', shift_hours=4.0, max_roster=50):
+        storage='warn', shift_hours=4.0, max_roster=50, sched='ab'):
     ds = ds or Dataset(); box = box if box is not None else load_box()
     ds.set_box(box)          # 让 skills_of 按精英化阶段过滤（明椒 E0 无 裁缝·β 等）
+    if sched == 'window' and abs(float(shift_hours) - 4.0) > 1e-6:
+        raise RuntimeError('--sched window 目前只支持 4h×6 班：emit/maa.py 的班次时间标签与 '
+                           'planTimes 写死了 6 班（非 4h 表要另外扩协议）')
     props = objectives.get(objective) if isinstance(objective, str) else objective
     obj_name = props.get('name') or props.get('key') or 'custom'
     cfg = LAYOUTS[layout] if isinstance(layout, str) else layout
@@ -157,7 +160,8 @@ def run(layout='333', objective='lmd_gold_bal', ds=None, box=None, width=16, top
         if verbose:
             print(f'      轮换压缩：合并 {len(merged)} 组 A/B → 唯一干员 {n_uniq}（上限 {max_roster}）'
                   f'{"✔" if n_uniq <= int(max_roster) else "✘ 仍超上限"}')
-    plan = build_plan(r['assign'], r['fixed'], ds, days=days, objective=props, hours=shift_hours)
+    plan = build_plan(r['assign'], r['fixed'], ds, days=days, objective=props, hours=shift_hours,
+                      sched=sched)
     kpi = plan['kpi']
     # —— 仓储/爆仓检查：**所有制造站都检测**，但只有班次 ≥6h 才可能爆仓（贸易站效率低，不检测）——
     from core import storage
@@ -181,11 +185,30 @@ def run(layout='333', objective='lmd_gold_bal', ds=None, box=None, width=16, top
         else:
             print(f'      仓储检查（班次 {shift_hours:g}h）：'
                   f'{"全部制造站不爆仓 ✔" if not overflow else f"⚠ 爆仓 {len(overflow)} 处 {overflow[:3]}"}')
-    # —— 单日心情闭环检测（用户口径）：00:00 满心情起步 → 次日 00:00 是否仍满 ——
-    from core.daycheck import morale_day
-    day = morale_day(plan['shifts'], ds)
-    if verbose:
-        print(f'      心情闭环检测：{day["report"]}')
+    # —— 心情可持续性检测（**判据 A：长期稳态**；字面口径作诊断列一起打印）——
+    if plan.get('daycheck'):
+        day = plan['daycheck']
+        if verbose:
+            wr = plan.get('window_result') or {}
+            print(f'      排班路径：window（干员级窗口排班，判据 A）'
+                  f'{"·排班无缺口 ✔" if wr.get("ok", True) else f"·⚠ 有 {len(wr.get("fails") or [])} 处排不出人"}')
+            for f in (wr.get('fails') or [])[:8]:
+                print(f'         {f["room"]} 第{f["slot"] + 1}班：{f["reason"]}（试了 {f["tried"]} 组）'
+                      + (f' 例：{f["sample"][0]["reasons"]}' if f.get('sample') else ''))
+            print(f'      心情检测：{day["report"]}')
+        if plan.get('window') is not None and (props.get('cons') or {}).get('gold_net'):
+            lo = (props['cons']['gold_net'] or (None, None))[0]
+            if lo is not None and kpi.get('gold_net', 0.0) < lo - 0.01:
+                print(f'      ⚠ 窗口路径实测赤金净 {kpi["gold_net"]:+.2f} < 约束下限 {lo:g}：'
+                      f'窗口排班让班组**连续上班**，贸易站订单品质吃满档 → 产量比 ab 高（龙门币约 +10%），'
+                      f'而求解器的赤字闸门是按 ab 的产量算的 → 需要"贸易站节流"或按窗口产量重算预算，'
+                      f'见 SKILL.md §10')
+    else:
+        from core.daycheck import morale_day
+        day = morale_day(plan['shifts'], ds)
+        if verbose:
+            print(f'      排班路径：ab（A/B 六班 + 恢复债寝室）')
+            print(f'      心情检测：{day["report"]}')
     # 爆仓策略：clip = 把超出容量的产出剪掉（宁可损失也不浪费空间被占死）
     if overflow and storage == 'clip':
         lost = collections.Counter()
@@ -202,7 +225,7 @@ def run(layout='333', objective='lmd_gold_bal', ds=None, box=None, width=16, top
             print(f'      已按“自动降效”剪掉超容量产出：{dict(lost)}')
     v = objectives.score(kpi, props)
     if verbose:
-        print(f"[4/5] 六班/寝室完成：14 天最低心情 {kpi['min_morale']:.1f}（{kpi['min_who']}），"
+        print(f"[4/5] 班次/寝室完成（{sched} 路径）：14 天最低心情 {kpi['min_morale']:.1f}（{kpi['min_who']}），"
               f"低于10 {sum(1 for x in kpi['lows'].values() if x < 10)} 人")
     doc = maa.deck_from_plan(plan, obj_name, layout_name)
     issues = maa.validate(doc, owned={o for o, v2 in box.items() if v2.get('own')})
@@ -219,8 +242,9 @@ def run(layout='333', objective='lmd_gold_bal', ds=None, box=None, width=16, top
         rpt = maa.report(plan, doc, kpi, obj_name, layout_name,
                          extra_lines=[f'电力：供 {supply} / 耗 {consume} / 净 {net}',
                                       f'固定房间：{fixed}',
+                                      f'排班路径：{sched}',
                                       f'目标组合：{props.get("key","")}'])
         open(os.path.join(out_dir, name + '.txt'), 'w', encoding='utf-8').write(rpt)
         if verbose: print(f'      已写出 {path}')
     return dict(assign=r['assign'], fixed=r['fixed'], plan=plan, kpi=kpi, doc=doc,
-                issues=issues, score=v, objective=props)
+                issues=issues, score=v, objective=props, sched=sched, daycheck=day)

@@ -19,7 +19,7 @@
 | 无人机分配 | ✅ 按"每架目标口径收益"投放；**不做余量封顶**，净消耗由模拟如实显示 |
 | 制造站仓储/爆仓 | ✅ 已实现；**所有制造站检测，仅班次 ≥6h 执行**；`--storage warn/clip/off` |
 | **单日心情闭环** | ✅ **判据已由用户裁定为 A（长期稳态）**：`core/daycheck.py` 默认 `criterion='steady'`（迭代到不动点、不被打穿、最低 ≥1），**字面口径降级为诊断列**照实打印（它在正常规模下结构性不可达：贴 00:00 在岗必回不满 + 末段 20 床 vs 最后一班 32 人 = −4.50/人）。默认路径实测：`判据A(长期稳态) ✔ 稳态最低心情 12.00`，KPI 无变化。详见 `planner/SKILL.md §10` |
-| **干员级窗口排班** | ⚠ **判定核 + 单房间排班已实现**：`solve/schedule.py`（`DayState/can_place/schedule_room/pack_dorms/verify`，默认 `policy='steady'`）+ `planner/probe_sched.py`（6,6,12 验收：判据 A **52/52 ✔**、无 24h 常驻、逐人对账误差 0.0）。**尚未接进求解器与默认路径**（`--sched` 开关未做，因为要改 `cli.py/solver.py/plan.py`） |
+| **干员级窗口排班** | ✅ **已接线**：`--sched window`（默认 `ab` 完全不变）。`solve/schedule.py`（判定核+组合层）+ `plan.build_window_shifts` + `solver.run(sched=)` + `cli --sched`。333/@4h 实测：判据 A ✔、排班无缺口、MAA 协议通过、龙门币 41,539（ab 38,756）、赤金净 +1.25、玉 660。**限制**：只支持 4h×6 班（`emit/maa.py` 写死 6 班标签）。**遗留**：窗口路径连续上班→订单品质满档→产量高于 ab，赤金预算闸门仍是按 ab 算的（可能被推到约束边缘，solver 会打 ⚠）→ 下一步"贸易站节流/按窗口产量重算预算"。见 `planner/SKILL.md §10.1`、`probe_win.py` |
 
 ## 3. 唯一未完成的大任务：window 调度器
 
@@ -45,9 +45,9 @@
    不满足 → 该候选判死，换人；全部排完 → daycheck 终检；失败则记录原因（床位 or 恢复）后重新分组枚举
 不允许常驻（无休息窗口的安排直接排除）
 ```
-**落点**：`solve/schedule.py` **已就位**（判定核 + 单房间排班 + 组合层示例在 `probe_sched.py`）；
-**还没做的**是把组合层搬进 `plan.py`（替换 `build_shifts/solve_dorms`）并加开关 `--sched ab|window`，
-**默认 ab 保持现状**。
+**落点**：`solve/schedule.py` **已就位并接线**（`--sched window`；默认 `ab` 不变，见 `SKILL.md §10.1`）。
+**剩下的活**：① 让窗口路径的产量反过来喂给预算修复（或做"贸易站节流"），把赤金净稳在约束内；
+② 若要支持非 4h 班次，需要先扩 `emit/maa.py`（`planTimes`/班次时间标签目前写死 6 班）。
 
 **禁动范围**：`core/rules.py`、`core/engine.py`、`core/orders.py`、`emit/maa.py` 的现有行为不要改；
 只允许**新增**文件与**在开关后**改 `plan.py`/`solver.py`。

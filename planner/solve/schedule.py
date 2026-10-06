@@ -584,3 +584,209 @@ def fmt_report(state, res=None, title=''):
         L.append('  终检器(daycheck)：' + str(res.get('report')))
         L.append('  预测/终检对账：' + str(reconcile(state, res)))
     return '\n'.join(L)
+
+
+# ================================================================ 组合层
+# 把求解器装配（assign/fixed）折成窗口排班需求 → 排满一天。plan.py 的 --sched window 用它。
+FIXED_DEFAULT_NEED = {'控制中枢': 5, '制造站': 3, '贸易站': 3, '发电站': 1, '会客室': 2,
+                      '人力办公室': 1, '加工站': 1, '训练室': 1}
+ROOM_PRIORITY = ['控制中枢', '会客室', '人力办公室', '加工站', '训练室',
+                 '制造站', '贸易站', '发电站']
+
+
+def dorm_leads(ds, pool, k=DORM_COUNT):
+    """找**宿舍恢复技**持有者（真实数据，不靠记忆）——常驻宿舍，只吃床位并提供恢复。"""
+    from core.engine import room_recovery
+    out = []
+    for op in pool:
+        best = max([room_recovery(s.desc) for s in ds.skills_of(op, '宿舍')] or [0.0])
+        if best > 0:
+            out.append((best, op))
+    out.sort(key=lambda t: (-t[0], t[1]))
+    return out[:k]
+
+
+def build_spec(assign=None, fixed=None, ctrl_pool=None, fixed_pools=None, ctrl_need=None,
+               fallback=None):
+    """把装配结果折成窗口排班需求清单。
+
+    assign: {(房间, 实例, 'A'|'B'): (产物, 等级, [干员])}
+    fixed:  {房间: [干员]}      固定房间的 A 班组
+    ctrl_pool: 控制中枢候选集（保 KPI 的元老+替补）
+    fixed_pools: {房间: [干员]} 固定房间可用的替补/轮换搭档
+    fallback: **兜底候选池**（一般给全干员池）。为什么需要：求解器给的 A/B 两队只有 ~18 人，
+              当在册名额（20 床 + 在岗人数）被先排的房间占满后，末班就只剩"已经连轴 5 班"的主力，
+              全被"常驻"判死 → 排不满（实测贸易站/发电站第 6 班全灭）。兜底池让他们有替班可选，
+              但**排在主力之后**（rank 里 primary 优先），所以不影响产出质量。
+    返回 [{room, inst, product, level, need, pool, primary}, …]（按 ROOM_PRIORITY 排序）
+    """
+    assign = assign or {}
+    fixed = fixed or {}
+    fixed_pools = fixed_pools or {}
+    by_room = {}
+    for (room, inst, _grp), (product, level, team) in assign.items():
+        rec = by_room.setdefault(room, {}).setdefault(int(inst), dict(product=None, level=3, teams=[]))
+        rec['teams'].append(list(team))
+        if product is not None:
+            rec['product'] = product
+        if level is not None:
+            rec['level'] = level
+    spec = []
+    for room, insts in by_room.items():
+        # **同房间、不同产物不共用候选池**：否则 LMD 班会抢走玉班（Orundum）的专精队伍，
+        # 实测会把合成玉从 656 打到 366，而龙门币只涨一点（得不偿失）。
+        by_prod = {}
+        for inst, rec in insts.items():
+            by_prod.setdefault(rec['product'], []).append(inst)
+        for _prod, group in by_prod.items():
+            pool = sorted({o for inst in group for t in insts[inst]['teams'] for o in t})
+            for inst in group:
+                rec = insts[inst]
+                need = max([len(t) for t in rec['teams']] or [FIXED_DEFAULT_NEED.get(room, 3)])
+                spec.append(dict(room=room, inst=inst, product=rec['product'], level=rec['level'],
+                                 need=need, pool=list(pool)))
+    for room in ('会客室', '人力办公室', '加工站', '训练室'):
+        team = list(fixed.get(room) or [])
+        pool = sorted(set(team) | set(fixed_pools.get(room) or []))
+        if not pool:
+            continue
+        spec.append(dict(room=room, inst=0, product=None, level=3,
+                         need=len(team) or FIXED_DEFAULT_NEED.get(room, 1), pool=pool))
+    if ctrl_pool:
+        spec.append(dict(room='控制中枢', inst=0, product=None, level=5,
+                         need=int(ctrl_need or FIXED_DEFAULT_NEED['控制中枢']),
+                         pool=sorted(set(ctrl_pool))))
+    for it in spec:                                   # 主力 / 兜底：主力永远优先
+        it['primary'] = set(it['pool'])
+        it['crews'] = _crews_of(assign, fixed, it['room'], it['product'])
+        if fallback:
+            it['pool'] = sorted(set(it['pool']) | {o for o in fallback})
+    spec.sort(key=lambda d: (ROOM_PRIORITY.index(d['room']) if d['room'] in ROOM_PRIORITY else 99,
+                             d['inst']))
+    return spec
+
+
+def _crews_of(assign, fixed, room, product):
+    """该房间**同产物**的整队清单（求解器算好的 A/B 班组）。
+
+    窗口排班以整队为单位落位，这样产出结构与求解器的预算修复假设一致
+    （否则会重挑出更会赚钱的队伍 → 赤金净亏）；而**必须按产物过滤**，
+    否则玉班的专精队伍会被排进龙门币站（实测合成玉 656 → 424）。
+    """
+    out = []
+    for (r, _inst, _grp), (p, _lv, team) in (assign or {}).items():
+        if r != room or p != product:
+            continue
+        t = tuple(team)
+        if t not in out:
+            out.append(t)
+    if room in ('会客室', '人力办公室', '加工站', '训练室'):
+        t = tuple(fixed.get(room) or [])
+        if t and t not in out:
+            out.append(t)
+    if room == '控制中枢':
+        return []                                     # 中枢按人排（成员本来就多，且要保全局加成）
+    return out
+
+
+def rank_spread(state, item, ds=None):
+    """默认候选排序：① 该房间**主力**（求解器算过的同产物 A/B 队）优先 ② **再摊人**
+    （当天上班班次数升序）③ 已在册者优先（少占床位名额）④ 技能多者优先。返回 key(op, slot)。
+
+    顺序很重要：主力必须排在"摊人"前面。实测把摊人放前面，会让玉站（Orundum）在主力已经上过
+    几班之后改用**没练过的替补**，合成玉 656 → 426；而主力优先时，主力每人 3~4 班正好覆盖
+    自己的房间（同产物池子已经隔离，不会再出现 18h 连轴）。
+    """
+    ds = ds or state.ds
+    room = item['room']
+    primary = item.get('primary') or set()
+
+    def key(op, slot):
+        load = sum(1 for i in range(state.n_slots) if op in state.working(i))
+        return (0 if op in primary else 1, load, 0 if op in state.roster() else 1,
+                -len(ds.skills_of(op, room)), op)
+    return key
+
+
+def avail_filter_cap(state, item):
+    """默认候选预滤：① 常驻宿舍的人不参与生产；② 在册名额不够整队时，新人一律不进候选
+    （否则枚举会在必然被床位拒掉的候选上空转）。返回 f(op, slot)。"""
+    prods = [j for j in range(state.n_slots) if j not in state.rest_slots]
+    cap = state.beds + min([state.target(j) for j in prods] or [state.beds])
+    k = int(item['need'])
+
+    def f(op, slot):
+        if op in state.parked:
+            return False
+        return True if op in state.roster() else len(state.roster()) + k <= cap
+    return f
+
+
+def team_score_eff(state, item):
+    """同一批可行候选里，**产出效率高的队伍先试**（否则窗口排班会白白丢掉产量）。返回 f(team, slot)。"""
+    room, product, level = item['room'], item['product'], item['level']
+
+    def f(team, slot):
+        return _team_eff(state, room, product, level, team, slot)
+    return f
+
+
+def try_crew(state, item, slot, ds=None):
+    """**整队落位**：按"这队今天上得最少"优先，整队一起判可行性；成功返回 True。
+
+    为什么以整队为单位：队伍的**构成**是求解器按目标最优算出来的（含赤金/碎片预算修复），
+    窗口排班只应决定"这队什么时候上"。若允许在池子里重挑人，实测会挑出更会赚龙门币的组合
+    → 赤金净从 +5.32 掉到 −15.31（违反用户"赤金不得净亏"的约束）。
+    """
+    ds = ds or state.ds
+    crews = [c for c in (item.get('crews') or []) if len(c) == int(item['need'])]
+    if not crews:
+        return False
+
+    def load_of(c):
+        return sum(sum(1 for i in range(state.n_slots) if op in state.working(i)) for op in c)
+    crews = sorted(crews, key=lambda c: (load_of(c), c))
+    for c in crews:
+        if any(op in state.working(slot) for op in c):
+            continue
+        snap = state.snapshot()
+        ok = True
+        for op in c:
+            good, _why = state.place(item['room'], item['inst'], slot, op,
+                                     item['product'], item['level'])
+            if not good:
+                ok = False
+                state.restore(snap)
+                break
+        if ok:
+            return True
+    return False
+
+
+def schedule_base(state, spec, order=None, topn=8, topn_max=16, combo_cap=120, score_eff=True,
+                  unit='crew'):
+    """**组合层**：按"区间优先"逐个 (房间, 区间) 调 `schedule_room`，把整座基建排满一天。
+
+    为什么区间优先：房间优先会让"必然排不出的尾班"先把床位名额吃光，反而把前面几班挤空（实测）。
+    unit='crew'：先试**整队**（求解器的 A/B 班组），整队都排不进才退化为逐人贪心（用兜底池）。
+    返回 dict(ok, fails, onduty, crews_used, greedy_used)
+    """
+    seq = order or [(slot, item) for slot in range(state.n_slots) if slot not in state.rest_slots
+                    for item in spec]
+    out = dict(ok=True, fails=[], onduty=sum(int(it['need']) for it in spec),
+               crews_used=0, greedy_used=0)
+    for slot, item in seq:
+        if unit == 'crew' and item.get('crews') and try_crew(state, item, slot):
+            out['crews_used'] += 1
+            continue
+        out['greedy_used'] += 1
+        r = schedule_room(state, item['room'], inst=item['inst'], product=item['product'],
+                          level=item['level'], need=item['need'], slots=[slot], pool=item['pool'],
+                          rank=rank_spread(state, item), avail_filter=avail_filter_cap(state, item),
+                          team_score=team_score_eff(state, item) if score_eff else None,
+                          topn=topn, topn_max=topn_max, combo_cap=combo_cap)
+        for f in r['failed']:
+            out['ok'] = False
+            out['fails'].append(dict(room=r['room'], slot=f['slot'], reason=f['reason'],
+                                     tried=f['tried'], sample=f.get('sample') or []))
+    return out

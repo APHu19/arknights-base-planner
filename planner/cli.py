@@ -170,7 +170,8 @@ def cmd_solve(a):
     obj = a.objective or OBJ.build(a.main, a.gold, a.shard, a.morale)
     got = run(layout=a.layout, objective=obj, width=a.width, topk=a.topk,
               rounds=a.rounds, days=a.days, fast=a.fast, out_dir=a.out,
-              storage=a.storage, shift_hours=a.shift_hours, max_roster=a.max_roster)
+              storage=a.storage, shift_hours=a.shift_hours, max_roster=a.max_roster,
+              sched=a.sched)
     k = got['kpi']
     print('\n' + '=' * 60)
     print(f"目标：{got['objective']['name']}")
@@ -218,8 +219,12 @@ def main():
                    help='每班时长（小时）。仓储检测只在 ≥6h 的班次执行')
     p.add_argument('--max-roster', type=int, default=0,
                    help='轮换人数上限（**默认 0 = 不压缩**）。⚠ 实测：靠“合并同站 A/B 两组”来压人数会把'
-                        '该站变成 24h 常驻 → 干员没有休息窗口 → 单日闭环直接崩（伤到 -12.6）。'
-                        '真正满足闭环需要“逐干员不等长工作窗口”的排班器，见 SKILL.md §7')
+                        '该站变成 24h 常驻 → 干员没有休息窗口 → 判据 A 也会崩。'
+                        '真正满足长期可持续需要“逐干员不等长工作窗口”的排班器 → 用 --sched window')
+    p.add_argument('--sched', default='ab', choices=['ab', 'window'],
+                   help='排班路径：ab=同站 A/B 整段轮换 + 恢复债寝室（**默认，保持现状**）；'
+                        'window=干员级窗口排班（按真实时间区间逐个 (房间,区间) 做增量可行性判定，'
+                        '判据 A=长期稳态；目前只支持 4h×6 班）')
     p.add_argument('--list', action='store_true', help='只列出可用目标与布局')
     p.set_defaults(f=cmd_solve)
     a = ap.parse_args()
