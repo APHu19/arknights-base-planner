@@ -46,9 +46,15 @@ POLICIES = ('steady', 'literal')   # 默认 steady = 判据 A（长期稳态）�
 STEADY_DAYS = 4          # 稳态迭代天数（第 1 天从 24 起算，之后接着走）
 STEADY_FLOOR = 1.0       # 稳态下全天最低心情下限（>0 = 绝不见底/不红脸）
 
-# 房间**物理**容量（含宿舍 5 床）；排人时不得超
-CAP = {'控制中枢': 5, '贸易站': 3, '制造站': 3, '发电站': 3, '会客室': 2,
-       '人力办公室': 1, '加工站': 1, '训练室': 1, '宿舍': BEDS_PER_DORM}
+# 房间**物理**容量：唯一权威在 core/dataset.ROOM_CAPACITY（发电站=1、人力办公室=1…）
+from core.dataset import ROOM_CAPACITY as _RC, capacity as _cap   # noqa: E402
+
+
+def CAP_of(room, level=3):
+    return _cap(room, level)
+
+
+CAP = {r: (min(v.values()) if isinstance(v, dict) else v) for r, v in _RC.items()}
 
 
 # ---------------------------------------------------------------- 时间轴
@@ -261,7 +267,7 @@ class DayState:
             return True, [], dict(already=True)
         if op in self.working(slot):
             return False, ['区间冲突：本区间已在其他房间在岗'], {}
-        cap = CAP.get(room, 3)
+        cap = CAP_of(room, level or 3)
         if cur and len(cur['team']) >= cap:
             return False, [f'{room} 容量已满({cap} 人)'], {}
         busy = [i for i in range(self.n_slots) if op in self.working(i)]
@@ -371,7 +377,7 @@ def schedule_room(state, room, inst=0, product=None, level=3, need=None, slots=N
       第一支全队通过的队伍落位；全带失败则沿"候选排名带"往后扩（topn → 2×topn → … → topn_max×4）。
     返回 dict(placed={区间: [干员]}, failed=[…], tried=…, forced=[…])
     """
-    need = int(need or CAP.get(room, 3))
+    need = int(need or CAP_of(room, level or 3))
     slots = list(range(state.n_slots)) if slots is None else list(slots)
     pool = list(pool or [])
     out = dict(room=f'{room}#{inst + 1}', need=need, placed={}, failed=[], forced=[], tried=0)
@@ -652,6 +658,7 @@ def build_spec(assign=None, fixed=None, ctrl_pool=None, fixed_pools=None, ctrl_n
             for inst in group:
                 rec = insts[inst]
                 need = max([len(t) for t in rec['teams']] or [FIXED_DEFAULT_NEED.get(room, 3)])
+                need = min(int(need), CAP_of(room, rec['level'] or 3))   # 绝不超房间进驻上限
                 spec.append(dict(room=room, inst=inst, product=rec['product'], level=rec['level'],
                                  need=need, pool=list(pool)))
     for room in ('会客室', '人力办公室', '加工站', '训练室'):
@@ -659,8 +666,8 @@ def build_spec(assign=None, fixed=None, ctrl_pool=None, fixed_pools=None, ctrl_n
         pool = sorted(set(team) | set(fixed_pools.get(room) or []))
         if not pool:
             continue
-        spec.append(dict(room=room, inst=0, product=None, level=3,
-                         need=len(team) or FIXED_DEFAULT_NEED.get(room, 1), pool=pool))
+        need = min(int(len(team) or FIXED_DEFAULT_NEED.get(room, 1)), CAP_of(room, 3))
+        spec.append(dict(room=room, inst=0, product=None, level=3, need=need, pool=pool))
     if ctrl_pool:
         spec.append(dict(room='控制中枢', inst=0, product=None, level=5,
                          need=int(ctrl_need or FIXED_DEFAULT_NEED['控制中枢']),

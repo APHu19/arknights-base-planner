@@ -10,7 +10,7 @@
 """
 import itertools, collections
 from core.engine import Ctx, shift_output, _resolve_resources
-from core.dataset import Dataset, load_box
+from core.dataset import Dataset, load_box, capacity
 from .pool import eligible_pool
 from .beam import beam_search
 
@@ -86,7 +86,8 @@ def assemble(cfg, ds=None, box=None, objective=None, width=20, topk=10, joint_be
         if key not in cands:
             ex = used if grp == 'A' else set()
             pool = [o for o in pools[room] if o not in ex]
-            cands[key] = beam_search(room, level, product, pool, ctx, ds, slots=3,
+            cands[key] = beam_search(room, level, product, pool, ctx, ds,
+                                     slots=capacity(room, level),
                                      width=width, hours=hours, topk=topk)
 
     # 联合 DFS + beam：按槽位顺序挑不重复的候选

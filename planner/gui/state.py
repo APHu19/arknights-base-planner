@@ -50,6 +50,10 @@ LAYOUT_PRESETS = {
                     ('制造站', 'Originium Shard', 3), ('制造站', 'Originium Shard', 3),
                     ('贸易站', 'LMD', 3), ('贸易站', 'Orundum', 3),
                     ('发电站', None, 3), ('发电站', None, 3)],
+    # 333 纯钱（对上 v13-A 那套）：3 制造全赤金 + 3 贸易全龙门币，**没有玉站**
+    '333纯钱': [('制造站', 'Pure Gold', 3), ('制造站', 'Pure Gold', 3), ('制造站', 'Pure Gold', 3),
+              ('贸易站', 'LMD', 3), ('贸易站', 'LMD', 3), ('贸易站', 'LMD', 3),
+              ('发电站', None, 3), ('发电站', None, 3), ('发电站', None, 3)],
 }
 
 DEFAULT_SHIFTS = [{'start': '00:00', 'end': '04:00'}, {'start': '04:00', 'end': '08:00'},
@@ -139,6 +143,38 @@ def _looks_like_path(t):
     return None
 
 
+def _merge_rows(box, rows, prefer=True):
+    """把一批条目并入干员池，**按与 load_box 相同的规则去重**。
+
+    为什么必须去重：MAA 导出里"阿米娅"有 3 条（char_002_amiya 持有 + 阿米娅近卫/术师未持有），
+    粘贴 JSON 内容时朴素的 `box[name] = …` 会让后面的未持有条目覆盖真正持有的那条 ——
+    表现就是"文件导入正常、剪贴板导入少一个（阿米娅）"。规则：**持有优先 → 精英化高 → char_ 前缀**。
+    """
+    best = {}
+    for o in rows:
+        if isinstance(o, dict) and o.get('name'):
+            name = o['name']
+            rec = _entry(name, o.get('own', 1), o.get('elite', 0))
+        elif isinstance(o, str):
+            name, rec = o, _entry(o)
+        else:
+            continue
+        oid = str(o.get('id') or '') if isinstance(o, dict) else ''
+        if isinstance(o, dict):
+            key = (rec['own'], rec['elite'], oid.startswith('char_'), oid)
+        else:
+            key = (rec['own'], rec['elite'], False, '')
+        if name not in best or key > best[name][0]:
+            best[name] = (key, rec)
+    out = dict(box)
+    for name, (key, rec) in best.items():
+        cur = out.get(name)
+        if prefer and cur and (not rec['own']) and cur.get('own'):
+            continue                       # 已有更好的（已持有）就别被未持有条目盖掉
+        out[name] = rec
+    return out
+
+
 def parse_box_text(text, base=None):
     """解析"剪贴板/文本框"内容。支持四种（按顺序尝试）：
        ① **文件路径**（如 C:\\...\\Arknights_OperBox_Export.json，可带引号）→ 按 JSON 读入
@@ -160,22 +196,22 @@ def parse_box_text(text, base=None):
         except Exception:
             raw = None
         if raw is not None:
-            for o in _rows_of(raw):
-                if isinstance(o, dict) and o.get('name'):
-                    box[o['name']] = _entry(o['name'], o.get('own', 1), o.get('elite', 0))
-                elif isinstance(o, str):
-                    box[o] = _entry(o)
-            return box
+            return _merge_rows(box, _rows_of(raw))
     for line in t.splitlines():
         line = line.strip().strip('"').strip("'")
         if not line:
             continue
         m = re.match(r'^(.+?)[\s,，\t]+(?:精)?([0-2])(?:\s|$)', line)
         if m:
-            box[m.group(1).strip()] = _entry(m.group(1).strip(), True, int(m.group(2)))
+            name = m.group(1).strip()
+            rec = _entry(name, True, int(m.group(2)))
         else:
-            cur = box.get(line) or {}
-            box[line] = _entry(line, True, cur.get('elite', 0))
+            rec = _entry(line, True, (box.get(line) or {}).get('elite', 0))
+            name = line
+        cur = box.get(name)
+        if cur and (not rec['own']) and cur.get('own'):
+            continue
+        box[name] = rec
     return box
 
 

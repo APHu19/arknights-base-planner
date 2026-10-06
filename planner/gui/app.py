@@ -93,7 +93,7 @@ class App(tk.Tk):
         self.q_var = tk.StringVar()
         e = ttk.Entry(top, textvariable=self.q_var, width=16); e.pack(side='left')
         e.bind('<KeyRelease>', lambda ev: self.refresh_ops())
-        self.show_unowned = tk.BooleanVar(value=False)
+        self.show_unowned = tk.BooleanVar(value=True)     # 默认**显示未持有**（用 ✘ 标注，而不是搜不到）
         ttk.Checkbutton(top, text='显示未持有', variable=self.show_unowned,
                         command=self.refresh_ops).pack(side='left', padx=8)
 
@@ -673,8 +673,12 @@ class App(tk.Tk):
                   font=('Microsoft YaHei', 10, 'bold')).pack(anchor='w')
         self.res_tree = ttk.Treeview(right, columns=('detail',), show='tree headings', height=12)
         self.res_tree.heading('#0', text='房间/班次'); self.res_tree.heading('detail', text='安排')
-        self.res_tree.column('#0', width=150); self.res_tree.column('detail', width=820)
-        self.res_tree.pack(fill='both', expand=True, pady=(2, 4))
+        self.res_tree.column('#0', width=150, stretch=False)
+        self.res_tree.column('detail', width=1400, stretch=False)   # 内容长 → 靠横向滑轨看，不用拉窗口
+        self.res_tree.pack(fill='both', expand=True, pady=(2, 0))
+        hb = ttk.Scrollbar(right, orient='horizontal', command=self.res_tree.xview)
+        self.res_tree.configure(xscrollcommand=hb.set)
+        hb.pack(fill='x', pady=(0, 4))
 
     def logln(self, s):
         self.log_q.put(s)
@@ -732,6 +736,10 @@ class App(tk.Tk):
             if me:
                 self.logln('[约束] 最低效率：' + '、'.join(f'{k} ≥ {v:g}' for k, v in me.items()))
             self.logln('[进度] 30% 正在枚举装配与固定房间…')
+            try:
+                other = float(self.other_var.get())
+            except Exception:
+                other = 450.0
             r = run(layout=cfg, objective=o, ds=None, box=self.st['box'],
                     width=int(self.w_var.get()), topk=int(self.k_var.get()),
                     rounds=int(self.r_var.get()), days=int(self.d_var.get()),
@@ -739,7 +747,7 @@ class App(tk.Tk):
                     storage=(self.storage_var.get() or 'warn').split('｜')[0],
                     shift_hours=float(self.hours_var.get() or 4),
                     sched=(self.sched_var.get() or 'ab').split('｜')[0], table=tbl,
-                    min_eff=me)
+                    min_eff=me, other_consume=other)
             self.result = r
             self.logln('[进度] 100% 完成')
             self.after(10, lambda: self.show_result(r))

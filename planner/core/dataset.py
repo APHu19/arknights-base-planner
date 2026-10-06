@@ -14,6 +14,22 @@ DATA = os.path.join(PLANNER, 'data')
 ROOT = os.path.dirname(PLANNER)          # dsh生成333基建表
 
 ROOMS = ['控制中枢', '贸易站', '制造站', '发电站', '会客室', '人力办公室', '加工站', '训练室', '宿舍']
+# **进驻人员上限**（权威来源：全机制.md 各设施等级表）
+#   · 制造站/贸易站 = 1/2/3（按等级）
+#   · 发电站 = **1**（Lv1/2/3 都是 1 —— 曾经按 3 排，白白塞了 6 个弱干员进去）
+#   · 会客室 = 2、人力办公室 = **1**（三级也只有 1 个工位）、加工站 = 1、训练室 = 1+1、控制中枢 = 5、宿舍 = 5
+ROOM_CAPACITY = {'控制中枢': 5, '贸易站': {1: 1, 2: 2, 3: 3}, '制造站': {1: 1, 2: 2, 3: 3},
+                 '发电站': 1, '会客室': 2, '人力办公室': 1, '加工站': 1, '训练室': 2, '宿舍': 5}
+
+
+def capacity(room, level=3):
+    """该房间在该等级的进驻上限（唯一权威，别在别处再写死 3）。"""
+    c = ROOM_CAPACITY.get(room, 1)
+    if isinstance(c, dict):
+        return int(c.get(int(level or 3), 3))
+    return int(c)
+
+
 # MAA 房间键（训练室不在协议内！）
 MAA_ROOM = {'控制中枢': 'control', '贸易站': 'trading', '制造站': 'manufacture', '发电站': 'power',
             '会客室': 'meeting', '人力办公室': 'hire', '加工站': 'processing', '宿舍': 'dormitory'}

@@ -14,6 +14,7 @@ from core.engine import Ctx, shift_output, RATE
 from core.dataset import Dataset, load_box
 from .pool import eligible_pool, score_team
 from .beam import beam_search
+from core.dataset import capacity
 from . import objectives
 
 FIXED_BASE = {
@@ -107,7 +108,8 @@ def _candidates(room, level, product, pool, ctx, ds, width, topk, hours):
         ranks.append(lambda out, rep: rep['eff'])
     out, seen = [], set()
     for rk in ranks:
-        for sc, team, rep in beam_search(room, level, product, pool, ctx, ds, slots=3,
+        for sc, team, rep in beam_search(room, level, product, pool, ctx, ds,
+                                         slots=capacity(room, level),
                                          width=width, hours=hours, topk=topk, rank=rk):
             key = tuple(sorted(team))
             if key in seen: continue

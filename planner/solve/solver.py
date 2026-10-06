@@ -142,7 +142,8 @@ def _compact_roster(assign, fixed, target=50):
 
 def run(layout='333', objective='lmd_gold_bal', ds=None, box=None, width=16, topk=8,
         rounds=2, days=14, fast=False, refine=True, verbose=True, out_dir=None,
-        storage='warn', shift_hours=4.0, max_roster=50, sched='ab', table=None, min_eff=None):
+        storage='warn', shift_hours=4.0, max_roster=50, sched='ab', table=None, min_eff=None,
+        other_consume=None):
     ds = ds or Dataset(); box = box if box is not None else load_box()
     ds.set_box(box)          # 让 skills_of 按精英化阶段过滤（明椒 E0 无 裁缝·β 等）
     if sched == 'window' and not table and abs(float(shift_hours) - 4.0) > 1e-6:
@@ -153,7 +154,7 @@ def run(layout='333', objective='lmd_gold_bal', ds=None, box=None, width=16, top
     cfg = LAYOUTS[layout] if isinstance(layout, str) else layout
     layout_name = layout if isinstance(layout, str) else '自定义'
     t0 = time.time()
-    supply, consume, net = check_power(cfg)
+    supply, consume, net = check_power(cfg, other_consume=other_consume)
     if net < 0:
         raise RuntimeError(f'电力不足：供 {supply} / 耗 {consume}（净 {net}）'
                            f'—— 可给部分制造/贸易站降级，或减少发电站以外的满级房间')
