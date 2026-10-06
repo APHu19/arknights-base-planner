@@ -10,16 +10,13 @@
   4. 床位 = 4 间 × 5 = **20** 是**每个区间**"不在岗人数"的上限，超了就不能再排人。
   5. `core/daycheck.py` 是**唯一终检器**；本模块不复制、不修改它的判据，只做"排人时的事前预测"。
 
-两个口径（务必分清，勿混用）
-  · 'literal'     —— 用户原话的字面判据：**次日 00:00 必须回到满心情**。
-                     凡在跨越/贴近 00:00 的区间在岗者，00:00 必然 < 24（消耗率恒 ≥0.05/h > 0，只有休息回血），
-                     故 **24h 全覆盖的班表在字面判据下数学上不可能通过**。本模块照原样算、照原样报。
-  · 'steady'      —— **长期稳态口径**（物理上正确的"长期可持续"）：把当天时间线反复迭代到不动点
-                     （第 1 天从 24 起算，之后每天拿当天末值接着走），要求**稳态那一天**
+两个口径（**判据 = A(steady) 已由用户裁定为正式验收口径**；literal 降级为诊断列）
+  · 'steady'（默认，判据 A）—— **长期稳态**：把当天时间线反复迭代到不动点（第 1 天从 24 起算，
+                     之后每天拿当天末值接着走），要求**稳态那一天**
                      ① 任何工作窗口都不被打穿（心情不归零）② 全天最低心情 ≥ STEADY_FLOOR。
-                     它等价于"两次上班之间的休息足以撑过下一段工作"，且**允许上下班连排**（连排＝一段长班）。
-  注意：'literal' 是用户原话；'steady' 是诊断用的物理口径，**不是**把判据改宽后冒充通过——
-  两者都算、都打印，`core/daycheck.py` 仍是唯一终检器。
+                     语义 = "两次上班之间的休息足以撑过下一段工作"，且**允许上下班连排**（连排＝一段长班）。
+  · 'literal'（诊断）—— 字面口径：次日 00:00 必须回满。实测在正常规模下**结构性不可达**，原因见文件尾。
+  `core/daycheck.py` 仍是唯一终检器，且它的默认判据已经同步为 A（两个口径都会打印，**不偷偷放宽**）。
 用法
     from solve import schedule as SCH
     st = SCH.DayState([6, 6, 12], ds=ds, policy='literal')
@@ -31,7 +28,9 @@
   ① **时间**：任何在跨越/贴近 00:00 的区间在岗的人，00:00 必然 < 24（消耗恒 > 0）⇒ 24h 全覆盖表在 literal 下必 ✘；
   ② **床位**：末段（00:00 前那段）只有 20 张床，而最后一班在岗 ~32 人 ⇒ 工作过末班的人在 00:00 前拿不到床位，
      照样回不满（实测恰好 −4.50/人）。要过 literal，必须让"最后一班在岗人数 ≤ 20"或允许区间内轮床。
-  ⇒ steady 口径（迭代到不动点、绝不见底）在 6,6,12 上 **52/52 通过**，且 daycheck 逐人对账误差 0.0。
+  ③ **用户裁定（2024 会话）**：正式验收口径改为 **A = steady**（迭代到不动点、绝不见底）——
+     6,6,12 在 A 下 **52/52 通过**（最低 7.50、无 24h 常驻、三班各 32 人在岗、床位 20/20），
+     `core/daycheck.py` 的默认判据也已同步为 A，且逐人对账误差 0.0；literal 只作为诊断列照实打印。
 """
 import itertools
 
@@ -43,7 +42,7 @@ BEDS_PER_DORM = 5
 DORM_COUNT = 4
 BED_CAP = BEDS_PER_DORM * DORM_COUNT          # 20
 EPS = 0.05
-POLICIES = ('literal', 'steady')
+POLICIES = ('steady', 'literal')   # 默认 steady = 判据 A（长期稳态），literal 仅作诊断
 STEADY_DAYS = 4          # 稳态迭代天数（第 1 天从 24 起算，之后接着走）
 STEADY_FLOOR = 1.0       # 稳态下全天最低心情下限（>0 = 绝不见底/不红脸）
 
@@ -87,7 +86,7 @@ class DayState:
     """
 
     def __init__(self, hours, ds=None, yanhuo=0.0, beds=BED_CAP,
-                 policy='literal', rest_rate=None, parked=None, targets=None, rest_slots=None):
+                 policy='steady', rest_rate=None, parked=None, targets=None, rest_slots=None):
         assert policy in POLICIES, f'policy 只能是 {POLICIES}'
         self.ds = ds or Dataset()
         self.hours = [float(h) for h in hours]
@@ -499,10 +498,11 @@ def bed_report(state):
     return rows
 
 
-def verify(state, ds=None):
-    """**唯一终检器**：core/daycheck.py。返回它的原始结果，另挂 'kernel'/'beds'/'overflow' 供对照。"""
+def verify(state, ds=None, criterion=None):
+    """**唯一终检器**：core/daycheck.py（默认判据 A = 长期稳态；criterion='literal' 可切到字面诊断）。
+    返回它的原始结果，另挂 'kernel'/'beds'/'bed_overflow' 供对照。"""
     from core.daycheck import morale_day
-    res = morale_day(to_shifts(state), ds or state.ds)
+    res = morale_day(to_shifts(state), ds or state.ds, criterion=criterion or state.policy)
     res['kernel'] = kernel_rows(state)
     res['beds'] = bed_report(state)
     res['bed_overflow'] = [r['slot'] for r in res['beds'] if r['over']]
@@ -568,8 +568,8 @@ def fmt_report(state, res=None, title=''):
     if kr:
         lit = sum(1 for r in kr if r['literal'])
         stb = sum(1 for r in kr if r['steady'])
-        L.append(f'  干员 {len(kr)} 人：字面口径(00:00回满) 达标 {lit}/{len(kr)}，'
-                 f'稳态口径 达标 {stb}/{len(kr)}，'
+        L.append(f'  干员 {len(kr)} 人：判据A(长期稳态) 达标 {stb}/{len(kr)}〔正式〕，'
+                 f'字面口径 达标 {lit}/{len(kr)}〔诊断〕，'
                  f'最低心情 {min(r["low"] for r in kr):.2f}，00:00 最低 {min(r["end"] for r in kr):.2f}')
         bad = [r for r in sorted(kr, key=lambda r: r['end']) if not r['literal']][:5]
         if bad:
