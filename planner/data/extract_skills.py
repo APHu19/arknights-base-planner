@@ -14,6 +14,8 @@ SRC = os.path.join(os.path.dirname(ROOT), '后勤技能一览带注释.md')
 OUT = os.path.join(BASE, 'skills_raw.json')
 
 ROOM_KEYS = ['控制中枢', '贸易站', '制造站', '发电站', '会客室', '人力办公室', '加工站', '训练室', '宿舍']
+# 源文档里的别名：wiki 该节标题写作“办公室”
+ROOM_ALIAS = {'办公室': '人力办公室', '人力资源办公室': '人力办公室'}
 
 HIDDEN = re.compile(r'<span[^>]*style="[^"]*display\s*:\s*none[^"]*"[^>]*>', re.I)
 
@@ -52,12 +54,21 @@ def cells(tr: str):
     return re.findall(r'<td[^>]*>(.*?)</td>', tr, re.S)
 
 def table_room(html: str, start: int) -> str:
-    """在 <table> 之前 3000 字符内找 tabber 标题，找不到就按顺序回退"""
-    ctx = html[max(0, start - 3000):start]
-    for k in ROOM_KEYS:
-        if f'>{k}<' in ctx or f'title="{k}"' in ctx:
-            return k
-    return '?'
+    """在 <table> 之前 1500 字符内找**最近**的 tabber/标题，找不到返回 '?'。
+
+    踩坑记录：wiki 里这一节的标题是**“办公室”**而不是“人力办公室”，旧实现按 ROOM_KEYS 顺序
+    返回"第一个出现过的房间名"，于是把办公室的表错挂到**上一个标题“加工站”**名下 ——
+    结果 `skills_raw.json` 里 "加工站" 出现两次、没有任何"人力办公室"技能，
+    导致 ①人力办公室无法优化 ②`--min-eff-hire` 假通过 ③感知信息（絮雨）体系无法建模。
+    """
+    ctx = html[max(0, start - 1500):start]
+    best, best_pos = '?', -1
+    for k in ROOM_KEYS + list(ROOM_ALIAS):
+        for pat in (f'>{k}<', f'title="{k}"', f'id="{k}"'):
+            p = ctx.rfind(pat)
+            if p > best_pos:
+                best, best_pos = ROOM_ALIAS.get(k, k), p
+    return best
 
 def main():
     html = open(SRC, encoding='utf-8', errors='replace').read()
