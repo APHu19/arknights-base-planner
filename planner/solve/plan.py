@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 """plan.py —— 由装配结果生成六班计划 + 寝室分配（恢复债）+ 菲亚梅塔目标 + 14 天复核"""
 import collections
+import math
 from core.engine import Ctx, simulate_shifts, drain_of, dorm_rooms_recovery, MAX_MORALE
 from core.dataset import Dataset, load_box
 from solve import schedule as SCN
@@ -184,6 +185,52 @@ def solve_dorms(shifts, ds, days=21, off_cap=20, allow_swaps=None, hours=4.0):
     return shifts, mor, dict(lows)
 
 
+def _drone_gold_fix(kpi_pre, kpi1, targets, assign, ctx, ds, objective, hours=4.0):
+    """**赤金约束反馈**：若投放无人机后赤金净仍低于约束下限，就把**最少几个班次**的无人机从
+    贸易站挪到赤金制造站，直到达标。返回 (新 targets, 说明)；无需调整时返回 (targets, None)。
+
+    为什么需要：窗口排班让班组连续上班 → 贸易站订单品质吃满档 → 产量高于 ab，
+    而求解器的赤字闸门是按 **ab 的产量**算的 ⇒ 赤金净被顶穿（实测 −1.22 ~ −15.31）。
+    为什么用无人机：它是连续旋钮（1 架 = 180/4320 ≈ 0.0417 赤金），比"停掉整班贸易站"
+    （一班 ≈ 6.9 赤金、还要丢 3000+ 龙门币）精确得多，而且不动队伍构成。
+    """
+    from solve import drones as DR
+    cons = (objective or {}).get('cons') or {}
+    rng = cons.get('gold_net')
+    if not rng or rng[0] is None or not targets:
+        return targets, None
+    floor = float(rng[0])
+    need = floor - float(kpi1.get('gold_net', 0.0))
+    if need <= 1e-9:
+        return targets, None
+    rows = DR.uses(assign, ctx, ds, hours)
+    gold_rows = [u for u in rows if (u.get('gain') or {}).get('gold')]
+    if not gold_rows:
+        return targets, None
+    use = max(gold_rows, key=lambda u: u['gain']['gold'])
+    per_shift = float(kpi_pre.get('drones', 0.0)) / max(1, len(targets))
+    gain_gold = use['gain']['gold'] * per_shift - use['gain'].get('gold_cost', 0.0) * per_shift
+    if gain_gold <= 0:
+        return targets, None
+    # 优先顶掉"投在贸易站（含龙门币收益）"的班次；按班次逐一累加收益，够了就停（不过量）
+    order = [i for i, t in enumerate(targets) if t and 'lmd' in (t.get('gain') or {})]
+    order += [i for i in range(len(targets)) if i not in order]
+    new, moved, got = list(targets), [], 0.0
+    for i in order:
+        if got >= need:
+            break
+        t = new[i]
+        before = ((t or {}).get('gain') or {})
+        delta = gain_gold + before.get('gold_cost', 0.0) * per_shift
+        new[i] = use
+        moved.append(i + 1)
+        got += delta
+    return new, dict(moved_shifts=moved, to=use['label'],
+                     per_drone_gold=round(use['gain']['gold'], 5),
+                     need_gold=round(need, 2), gained_gold=round(got, 2),
+                     drones_per_shift=round(per_shift, 1))
+
+
 def build_plan(assign, fixed, ds=None, days=14, objective=None, hours=4.0, sched='ab'):
     """sched='ab'（默认，现状）：A/B 六班 + 恢复债寝室；sched='window'：干员级窗口排班（判据 A）。"""
     ds = ds or Dataset()
@@ -208,7 +255,14 @@ def build_plan(assign, fixed, ds=None, days=14, objective=None, hours=4.0, sched
         ctx.by_room = rebuild
         ctx.staffed = [o for ops in rebuild.values() for o in ops]
         targets, detail = DR.allocate(assign, ctx, ds, objective, kpi)
-        kpi = DR.apply_to_kpi(kpi, targets, assign, ctx, ds, objective)
+        kpi1 = DR.apply_to_kpi(kpi, targets, assign, ctx, ds, objective)
+        # —— 赤金约束反馈（窗口路径尤其需要）：把最少几个班次的无人机从贸易站挪到赤金制造站，
+        #    直到赤金净 ≥ 约束下限。无人机是**连续旋钮**（1 架 = 180/4320 赤金），
+        #    比"停掉整班贸易站"精确得多；且只动无人机，不破坏队伍构成。——
+        targets, fix = _drone_gold_fix(kpi, kpi1, targets, assign, ctx, ds, objective)
+        kpi = DR.apply_to_kpi(kpi, targets, assign, ctx, ds, objective) if fix else kpi1
+        if fix:
+            detail['gold_fix'] = fix
         for sh, s in enumerate(shifts):
             t = targets[sh] if sh < len(targets) else None
             s['drones'] = ({'room': t['maa_room'], 'index': t['index']} if t else None)

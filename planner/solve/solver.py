@@ -225,6 +225,11 @@ def run(layout='333', objective='lmd_gold_bal', ds=None, box=None, width=16, top
             print(f'      已按“自动降效”剪掉超容量产出：{dict(lost)}')
     v = objectives.score(kpi, props)
     if verbose:
+        gf = (plan.get('drone_detail') or {}).get('gold_fix')
+        if gf:
+            print(f"      ⚙ 赤金反馈：把第 {'、'.join(map(str, gf['moved_shifts']))} 班的无人机改投 "
+                  f"{gf['to']}（每架 {gf['per_drone_gold']:g} 赤金；需补 {gf['need_gold']:+.2f}，"
+                  f"实补 {gf['gained_gold']:+.2f} 赤金/天）")
         print(f"[4/5] 班次/寝室完成（{sched} 路径）：14 天最低心情 {kpi['min_morale']:.1f}（{kpi['min_who']}），"
               f"低于10 {sum(1 for x in kpi['lows'].values() if x < 10)} 人")
     doc = maa.deck_from_plan(plan, obj_name, layout_name)
