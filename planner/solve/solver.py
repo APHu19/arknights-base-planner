@@ -108,12 +108,12 @@ def _compact_roster(assign, fixed, target=50):
 
 def run(layout='333', objective='lmd_gold_bal', ds=None, box=None, width=16, topk=8,
         rounds=2, days=14, fast=False, refine=True, verbose=True, out_dir=None,
-        storage='warn', shift_hours=4.0, max_roster=50, sched='ab'):
+        storage='warn', shift_hours=4.0, max_roster=50, sched='ab', table=None):
     ds = ds or Dataset(); box = box if box is not None else load_box()
     ds.set_box(box)          # 让 skills_of 按精英化阶段过滤（明椒 E0 无 裁缝·β 等）
-    if sched == 'window' and abs(float(shift_hours) - 4.0) > 1e-6:
-        raise RuntimeError('--sched window 目前只支持 4h×6 班：emit/maa.py 的班次时间标签与 '
-                           'planTimes 写死了 6 班（非 4h 表要另外扩协议）')
+    if sched == 'window' and not table and abs(float(shift_hours) - 4.0) > 1e-6:
+        raise RuntimeError('--sched window 只支持 4h×6 班，或显式给 --shifts 自定义班次表：'
+                           'emit/maa.py 的班次时间标签与 planTimes 原本写死 6 班')
     props = objectives.get(objective) if isinstance(objective, str) else objective
     obj_name = props.get('name') or props.get('key') or 'custom'
     cfg = LAYOUTS[layout] if isinstance(layout, str) else layout
@@ -161,7 +161,7 @@ def run(layout='333', objective='lmd_gold_bal', ds=None, box=None, width=16, top
             print(f'      轮换压缩：合并 {len(merged)} 组 A/B → 唯一干员 {n_uniq}（上限 {max_roster}）'
                   f'{"✔" if n_uniq <= int(max_roster) else "✘ 仍超上限"}')
     plan = build_plan(r['assign'], r['fixed'], ds, days=days, objective=props, hours=shift_hours,
-                      sched=sched)
+                      sched=sched, table=table)
     kpi = plan['kpi']
     # —— 仓储/爆仓检查：**所有制造站都检测**，但只有班次 ≥6h 才可能爆仓（贸易站效率低，不检测）——
     from core import storage

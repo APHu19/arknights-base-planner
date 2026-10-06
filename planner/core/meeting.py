@@ -132,10 +132,14 @@ def speed(team, ds, box=None, morale=None, ambience=0.0, exchanging=False, hours
 
 
 def clue_per_day(plan_shifts, ds, box=None, morale=None, hours=4.0):
-    """按六班表算会客室线索产出（取各班次的平均速度）"""
-    vals = []
+    """按班次表算会客室线索产出（**按班次时长加权平均**；等长表结果与旧口径完全一致）。
+    为什么不直接取算术平均：自定义班次表可以不等长（例：22:00→10:00 是 12h），
+    算术平均会让 6h 的班和 12h 的班等价，产物被高估/低估。"""
+    vals, wts = [], []
     for s in plan_shifts:
         team = next((ops for (room, prod, lv, ops) in s['rooms'] if room == '会客室'), None)
         if not team: continue
-        vals.append(speed(team, ds, box, morale, hours=hours)['clue_per_day'])
-    return (sum(vals) / len(vals)) if vals else 0.0
+        h = float(s.get('hours') or hours)
+        vals.append(speed(team, ds, box, morale, hours=h)['clue_per_day'])
+        wts.append(h)
+    return (sum(v * w for v, w in zip(vals, wts)) / sum(wts)) if wts else 0.0

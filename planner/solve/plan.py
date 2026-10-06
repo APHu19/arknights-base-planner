@@ -51,7 +51,8 @@ def _fixed_pools():
     return out
 
 
-def build_window_shifts(assign, fixed, ds=None, hours=4.0, policy='steady', park_leads=0):
+def build_window_shifts(assign, fixed, ds=None, hours=4.0, policy='steady', park_leads=0,
+                        table=None):
     """window 路径：把装配结果排成对**判据 A（长期稳态）**可行的一天。
 
     与 ab 路径的区别：不再用"A 组/B 组整段轮换 + 恢复债分寝室"，
@@ -68,14 +69,14 @@ def build_window_shifts(assign, fixed, ds=None, hours=4.0, policy='steady', park
     owned = sorted(n for n, v in box.items() if v.get('own', True))
     spec = SCN.build_spec(assign, fixed, ctrl_pool=_ctrl_pool(), fixed_pools=_fixed_pools(),
                           ctrl_need=len(CTRL_A), fallback=owned)
-    n_shifts = max(1, int(round(24.0 / float(hours or 4.0))))
+    n_shifts = len(table) if table else max(1, int(round(24.0 / float(hours or 4.0))))
     onduty = sum(int(it['need']) for it in spec)
     used = {o for it in spec for o in it['primary']}
     parked = []
     if park_leads:
         parked = [o for _b, o in SCN.dorm_leads(ds, [n for n in owned if n not in used])][:int(park_leads)]
     st = SCN.DayState([hours] * n_shifts, ds=ds, policy=policy, parked=parked,
-                      targets={i: onduty for i in range(n_shifts)})
+                      targets={i: onduty for i in range(n_shifts)}, table=table)
     res = SCN.schedule_base(st, spec)
     SCN.pack_dorms(st, ds, leads=parked)
     res['parked'] = parked
@@ -85,12 +86,17 @@ def build_window_shifts(assign, fixed, ds=None, hours=4.0, policy='steady', park
     return SCN.to_shifts(st), st, res
 
 
-def build_shifts(assign, fixed, ds=None, hours=4.0):
+def build_shifts(assign, fixed, ds=None, hours=4.0, table=None):
     """assign: {(房间,i,grp): (product, level, team)}；fixed: {房间: [干员]}
-    班次数由时长决定：**24h / 班次时长**（4h→6 班、6h→4 班、8h→3 班、12h→2 班），A/B 交替。
+    班次数由时长决定：**24h / 班次时长**（4h→6 班、6h→4 班、8h→3 班、12h→2 班），A/B 交替；
+    也可传 `table`（core.shiftplan 自定义班次表，可不等长）——此时班次数与各班长短都来自表。
     控制中枢的两段轮休（第 3、6 班）只在 6 班结构下按原样套用。"""
     ds = ds or Dataset()
-    n_shifts = max(1, int(round(24.0 / float(hours or 4.0))))
+    if table:
+        hl = [float(t['hours']) for t in table]
+    else:
+        hl = [float(hours or 4.0)] * max(1, int(round(24.0 / float(hours or 4.0))))
+    n_shifts = len(hl)
     shifts = []
     for i in range(n_shifts):
         grp = 'A' if i % 2 == 0 else 'B'
@@ -119,13 +125,20 @@ def build_shifts(assign, fixed, ds=None, hours=4.0):
         if meet: rooms.append(('会客室', None, 3, meet))
         if hire: rooms.append(('人力办公室', None, 3, hire))
         if work: rooms.append(('加工站', None, 3, work))
-        shifts.append(dict(rooms=rooms, dorm=[], fia={}))
+        item = dict(rooms=rooms, dorm=[], fia={}, hours=hl[i])
+        if table:
+            t = table[i]
+            item.update(name=f"第{t['index']}班（{t['start']}-{t['end']}）",
+                        period=[t['start'], t['end']], duration=int(t['minutes']),
+                        clock=(t['start'], t['end']))
+        shifts.append(item)
     return shifts
 
 
-def solve_dorms(shifts, ds, days=21, off_cap=20, allow_swaps=None, hours=4.0):
+def solve_dorms(shifts, ds, days=21, off_cap=20, allow_swaps=None, hours=4.0, table=None):
     """恢复债驱动的寝室分配：每班把“累计消耗−累计恢复”最大者优先安排进宿舍。
     allow_swaps：允许菲亚梅塔交换的班次集合（None = 先全开以采集需求，再按每天 2 次收敛）。
+    各班长短取自 `s['hours']`（自定义班次表可不等长）；无该键时退回统一的 hours。
     返回 (每班寝室列表, 最终心情, 心情最低值)"""
     if allow_swaps is None:
         allow_swaps = set(range(len(shifts)))
@@ -140,6 +153,7 @@ def solve_dorms(shifts, ds, days=21, off_cap=20, allow_swaps=None, hours=4.0):
     last = None
     for day in range(days):
         for sh, s in enumerate(shifts):
+            h = float(s.get('hours') or hours)          # 自定义班次可不等长
             ctrl = next((ops for r, p, lv, ops in s['rooms'] if r == '控制中枢'), [])
             c0 = Ctx(ds=ds); c0.by_room = {}
             for r, p, lv, ops in s['rooms']:
@@ -149,7 +163,7 @@ def solve_dorms(shifts, ds, days=21, off_cap=20, allow_swaps=None, hours=4.0):
             res = _resolve_resources(c0, c0.staffed, c0.base_resources(), ds)
             for r, p, lv, ops in s['rooms']:
                 for o, v in drain_of(r, ops, ctrl, res.get('人间烟火', 0.0), ds).items():
-                    mor[o] = max(0.0, mor[o] - v * hours); debt[o] += v * hours
+                    mor[o] = max(0.0, mor[o] - v * h); debt[o] += v * h
             working = {o for r, p, lv, ops in s['rooms'] for o in ops}
             rest = [o for o in roster if o not in working and o not in DORM_LEADS]
             rest.sort(key=lambda o: -debt[o])
@@ -160,7 +174,7 @@ def solve_dorms(shifts, ds, days=21, off_cap=20, allow_swaps=None, hours=4.0):
             for r in rooms:
                 rr = dorm_rooms_recovery([r], ds)[0]
                 for o in r:
-                    mor[o] = min(MAX_MORALE, mor[o] + rr * hours); debt[o] -= rr * hours
+                    mor[o] = min(MAX_MORALE, mor[o] + rr * h); debt[o] -= rr * h
             # 菲亚梅塔：只给“最缺心情的在岗者”且受每天 2 次限制
             if sh in allow_swaps and mor[FIA] >= 20.0:
                 cands = [o for o in working if o not in DORM_LEADS]
@@ -231,15 +245,16 @@ def _drone_gold_fix(kpi_pre, kpi1, targets, assign, ctx, ds, objective, hours=4.
                      drones_per_shift=round(per_shift, 1))
 
 
-def build_plan(assign, fixed, ds=None, days=14, objective=None, hours=4.0, sched='ab'):
-    """sched='ab'（默认，现状）：A/B 六班 + 恢复债寝室；sched='window'：干员级窗口排班（判据 A）。"""
+def build_plan(assign, fixed, ds=None, days=14, objective=None, hours=4.0, sched='ab', table=None):
+    """sched='ab'（默认，现状）：A/B 六班 + 恢复债寝室；sched='window'：干员级窗口排班（判据 A）。
+    table：`core.shiftplan` 的自定义班次表（可不等长，例 22:00/10:00/16:00 → 12h/6h/6h）。"""
     ds = ds or Dataset()
     window = wres = daycheck = None
     if sched == 'window':
-        shifts, window, wres = build_window_shifts(assign, fixed, ds, hours=hours)
+        shifts, window, wres = build_window_shifts(assign, fixed, ds, hours=hours, table=table)
     else:
-        shifts = build_shifts(assign, fixed, ds, hours=hours)
-        shifts, mor, lows = solve_dorms(shifts, ds, hours=hours)
+        shifts = build_shifts(assign, fixed, ds, hours=hours, table=table)
+        shifts, mor, lows = solve_dorms(shifts, ds, hours=hours, table=table)
     kpi = simulate_shifts(shifts, days=days, hours=hours, ds=ds)
     detail = {}
     if objective:

@@ -408,6 +408,8 @@ def simulate_shifts(shifts, days=14, hours=4.0, ds=None):
     for day in range(days):
         day_kpi = collections.Counter()
         for sh, s in enumerate(shifts):
+            # **逐班时长**：自定义班次表可不等长（s['hours']）；没有该键时退回统一的 hours（旧行为不变）
+            h = float(s.get('hours') or hours)
             ctrl = next((ops for r, p, lv, ops in s['rooms'] if r == '控制中枢'), [])
             staffed = [o for r, p, lv, ops in s['rooms'] for o in ops]
             c0 = Ctx(ds=ds)
@@ -419,11 +421,11 @@ def simulate_shifts(shifts, days=14, hours=4.0, ds=None):
             yanhuo = res.get('人间烟火', 0.0)
             for r, p, lv, ops in s['rooms']:
                 for o, v in drain_of(r, ops, ctrl, yanhuo, ds).items():
-                    mor[o] = max(0.0, mor[o] - v * hours)
+                    mor[o] = max(0.0, mor[o] - v * h)
             for d in s['dorm']:
                 if not d: continue
                 rr = dorm_rooms_recovery([d], ds)[0]
-                for o in d: mor[o] = min(MAX_MORALE, mor[o] + rr * hours)
+                for o in d: mor[o] = min(MAX_MORALE, mor[o] + rr * h)
             fia = s['fia'] or {}
             if fia.get('enable') and mor.get('菲亚梅塔', 0) >= 20.0:
                 tgt = fia.get('target')
@@ -431,11 +433,11 @@ def simulate_shifts(shifts, days=14, hours=4.0, ds=None):
                     mor['菲亚梅塔'], mor[tgt] = mor[tgt], mor['菲亚梅塔']
             for r, p, lv, ops in s['rooms']:
                 if not ops: continue
-                out, _ = shift_output(r, lv, p, ops, c0, hours, ds)
+                out, _ = shift_output(r, lv, p, ops, c0, h, ds)
                 for k, v in out.items(): day_kpi[k] += v
             pw = [ops for r, p, lv, ops in s['rooms'] if r == '发电站']
             if pw:
-                dn, bonus = power_charge(pw, hours, ds)
+                dn, bonus = power_charge(pw, h, ds)
                 day_kpi['drones'] += dn
             for o in mor: lows[o] = min(lows[o], mor[o])
         per_day.update(day_kpi)

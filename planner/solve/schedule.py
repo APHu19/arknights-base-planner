@@ -86,10 +86,13 @@ class DayState:
     """
 
     def __init__(self, hours, ds=None, yanhuo=0.0, beds=BED_CAP,
-                 policy='steady', rest_rate=None, parked=None, targets=None, rest_slots=None):
+                 policy='steady', rest_rate=None, parked=None, targets=None, rest_slots=None,
+                 table=None):
         assert policy in POLICIES, f'policy 只能是 {POLICIES}'
         self.ds = ds or Dataset()
-        self.hours = [float(h) for h in hours]
+        # table = core.shiftplan 的班次表（自定义班次时用它给出各班长短与时钟标签）
+        self.table = list(table) if table else None
+        self.hours = [float(t['hours']) for t in self.table] if self.table else [float(h) for h in hours]
         self.win = windows(self.hours)
         self.yanhuo = float(yanhuo)
         self.beds = int(beds)
@@ -483,8 +486,14 @@ def to_shifts(state):
             if s != i or not v['team']:
                 continue
             rooms.append((r, v['product'], v['level'], list(v['team'])))
-        out.append(dict(rooms=rooms, dorm=[list(d) for d in (state.dorm.get(i) or [])],
-                        fia={}, hours=h, start=t0, end=t1))
+        item = dict(rooms=rooms, dorm=[list(d) for d in (state.dorm.get(i) or [])],
+                    fia={}, hours=h, start=t0, end=t1)
+        if state.table:                      # 自定义班次：带上时钟标签，供 MAA 的 period/duration 用
+            t = state.table[i]
+            item.update(name=f"第{t['index']}班（{t['start']}-{t['end']}）",
+                        period=[t['start'], t['end']], duration=int(t['minutes']),
+                        clock=(t['start'], t['end']))
+        out.append(item)
     return out
 
 

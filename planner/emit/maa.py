@@ -21,6 +21,8 @@ SHIFT_TIME = ['00:00-04:00', '04:00-08:00', '08:00-12:00', '12:00-16:00', '16:00
 
 def deck_from_plan(plan, objective, layout_name='333', title=None, author='aphu + DSH'):
     shifts = plan['shifts']
+    custom = all(s.get('period') and s.get('duration') for s in shifts) if shifts else False
+    n = len(shifts)
     # 无人机目标：按目标优先级在“制造站/贸易站”里各挑一个实例
     def inst_index(room_name, product_pref):
         for idx, (room, prod, lv, ops) in enumerate(_layout_instances(plan, room_name)):
@@ -54,7 +56,7 @@ def deck_from_plan(plan, objective, layout_name='333', title=None, author='aphu 
             drone_room = 'manufacture' if i % 2 == 0 else 'trading'
             drone_index = mi if drone_room == 'manufacture' else ti
         plans.append({
-            'name': f'第{i+1:02d}班（{SHIFT_TIME[i]}）',
+            'name': s.get('name') or f'第{i+1:02d}班（{SHIFT_TIME[i] if i < len(SHIFT_TIME) else ""}）',
             'description': f"{objective}｜{'制造站' if i % 2 == 0 else '贸易站'}加速",
             'description_post': '',
             'Fiammetta': {'enable': bool(fia.get('enable') and fia.get('target')),
@@ -63,12 +65,16 @@ def deck_from_plan(plan, objective, layout_name='333', title=None, author='aphu 
                        'index': drone_index, 'order': 'pre'},
             'rooms': rooms,
         })
+        if s.get('period'):                      # 自定义班次表：写出真实时段与时长
+            plans[-1]['period'] = list(s['period'])
+            plans[-1]['duration'] = int(s['duration'])
     return {'author': author,
             'id': int(time.time() * 1000),
             'title': title or f'{layout_name} 基建排班（{objective}）',
             'description': f'由 planner 自动枚举生成；目标={objective}；训练室不放人；寝室最后处理；菲亚梅塔 order=pre',
-            'planTimes': '6班',
-            'scheduleType': {'planTimes': 6, 'trading': 3, 'manufacture': 3, 'power': 3, 'dormitory': 4},
+            'planTimes': f'{n}班' if custom else '6班',
+            'scheduleType': {'planTimes': n if custom else 6, 'trading': 3, 'manufacture': 3,
+                             'power': 3, 'dormitory': 4},
             'plans': plans}
 
 
@@ -95,8 +101,30 @@ def _drone_prefs(objective):
 def validate(doc, owned=None):
     """协议校验：返回问题列表（空 = 通过）"""
     issues = []
-    if doc.get('planTimes') != '6班': issues.append('planTimes 应为 6班')
-    for i, p in enumerate(doc.get('plans', [])):
+    plans = doc.get('plans') or []
+    pt = doc.get('planTimes')
+    if pt != '6班' and pt != f'{len(plans)}班':
+        issues.append(f'planTimes 应为 6班 或与班次数一致（当前 {pt}，实际 {len(plans)} 班）')
+    # 自定义班次表：校验 period/duration 连续覆盖 24h
+    if plans and all(p.get('period') and p.get('duration') for p in plans):
+        total = 0
+        for i, p in enumerate(plans):
+            per = p['period']
+            if (not isinstance(per, (list, tuple)) or len(per) != 2
+                    or not all(isinstance(x, str) and len(x) == 5 and x[2] == ':' for x in per)):
+                issues.append(f'第{i+1}班 period 格式应为 ["HH:MM","HH:MM"]（当前 {per}）')
+                continue
+            hh, mm = per[1].split(':')
+            dur = p['duration']
+            if dur != int(p['duration']) or dur <= 0:
+                issues.append(f'第{i+1}班 duration 应为正整数分钟（当前 {dur}）')
+            total += int(dur)
+            if i and plans[i - 1]['period'][1] != per[0]:
+                issues.append(f'第{i+1}班 period 起点 {per[0]} 与上一班终点 '
+                              f'{plans[i-1]["period"][1]} 不连续')
+        if total != 1440:
+            issues.append(f'自定义班次总时长 {total} 分钟 ≠ 1440（必须覆盖整天）')
+    for i, p in enumerate(plans):
         tag = f'第{i+1}班'
         for k in p:
             if k not in ('name', 'description', 'description_post', 'Fiammetta', 'drones', 'rooms',

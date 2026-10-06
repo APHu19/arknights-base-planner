@@ -168,10 +168,19 @@ def cmd_solve(a):
             print(f'  {k:<8} 电力 供 {s} / 耗 {c:.0f} / 净 {n:+.0f} {"✔" if n >= 0 else "✘"}   等级 {lvs}')
         return
     obj = a.objective or OBJ.build(a.main, a.gold, a.shard, a.morale)
+    table = None
+    if a.shifts:
+        from core import shiftplan as SP
+        try:
+            table = SP.build_table([x for x in str(a.shifts).replace('，', ',').split(',') if x.strip()])
+        except ValueError as e:
+            print(f'✘ 班次表有误：{e}')
+            return 2
+        print(f'自定义班次表：{SP.summary(table)}   （合计 {SP.total_minutes(table)} 分钟）')
     got = run(layout=a.layout, objective=obj, width=a.width, topk=a.topk,
               rounds=a.rounds, days=a.days, fast=a.fast, out_dir=a.out,
               storage=a.storage, shift_hours=a.shift_hours, max_roster=a.max_roster,
-              sched=a.sched)
+              sched=a.sched, table=table)
     k = got['kpi']
     print('\n' + '=' * 60)
     print(f"目标：{got['objective']['name']}")
@@ -225,6 +234,11 @@ def main():
                    help='排班路径：ab=同站 A/B 整段轮换 + 恢复债寝室（**默认，保持现状**）；'
                         'window=干员级窗口排班（按真实时间区间逐个 (房间,区间) 做增量可行性判定，'
                         '判据 A=长期稳态；目前只支持 4h×6 班）')
+    p.add_argument('--shifts', default=None,
+                   help='自定义班次表：逗号分隔的**开始时间**（HH:MM），按你想要的顺序给，'
+                        '结束时间自动取下一班的开始时间（最后一班回到第一班，闭环）。'
+                        '例：--shifts "22:00,10:00,16:00" = 第1班 22:00→10:00(12h)、'
+                        '第2班 10:00→16:00(6h)、第3班 16:00→22:00(6h)')
     p.add_argument('--list', action='store_true', help='只列出可用目标与布局')
     p.set_defaults(f=cmd_solve)
     a = ap.parse_args()
