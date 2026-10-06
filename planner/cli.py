@@ -1,6 +1,12 @@
 # -*- coding: utf-8 -*-
 """CLI：terms / room / sim / selftest"""
 import sys, os, json, argparse
+# 控制台可能是 GBK（Windows 默认），直接 print '✔' 会 UnicodeEncodeError 崩溃 → 强制 UTF-8 且编码失败不中断
+try:
+    sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+    sys.stderr.reconfigure(encoding='utf-8', errors='replace')
+except Exception:
+    pass
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from core.dataset import Dataset, load_box
 from core.engine import Ctx, eval_room, simulate, drain_of, RATE, power_charge
