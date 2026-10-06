@@ -1,0 +1,1306 @@
+{
+    "author": "aphu + DSH",
+    "id": 1791236104843,
+    "title": "333 基建排班（合成玉最大化 · 赤金不得净亏（净≥0） · 碎片产能 ≥ 玉站消化）",
+    "description": "由 planner 自动枚举生成；目标=合成玉最大化 · 赤金不得净亏（净≥0） · 碎片产能 ≥ 玉站消化；训练室不放人；寝室最后处理；菲亚梅塔 order=pre",
+    "planTimes": "6班",
+    "scheduleType": {
+        "planTimes": 6,
+        "trading": 3,
+        "manufacture": 3,
+        "power": 3,
+        "dormitory": 4
+    },
+    "plans": [
+        {
+            "name": "第01班（00:00-04:00）",
+            "description": "合成玉最大化 · 赤金不得净亏（净≥0） · 碎片产能 ≥ 玉站消化｜制造站加速",
+            "description_post": "",
+            "Fiammetta": {
+                "enable": false,
+                "target": "",
+                "order": "pre"
+            },
+            "drones": {
+                "enable": true,
+                "room": "trading",
+                "index": 3,
+                "order": "pre"
+            },
+            "rooms": {
+                "trading": [
+                    {
+                        "skip": false,
+                        "product": "Orundum",
+                        "operators": [
+                            "德克萨斯",
+                            "拉普兰德",
+                            "海蒂"
+                        ],
+                        "sort": false,
+                        "autofill": false
+                    },
+                    {
+                        "skip": false,
+                        "product": "LMD",
+                        "operators": [
+                            "能天使",
+                            "蕾缪安",
+                            "衡沙"
+                        ],
+                        "sort": false,
+                        "autofill": false
+                    },
+                    {
+                        "skip": false,
+                        "product": "LMD",
+                        "operators": [
+                            "鸿雪",
+                            "麒麟R夜刀",
+                            "U-Official"
+                        ],
+                        "sort": false,
+                        "autofill": false
+                    }
+                ],
+                "manufacture": [
+                    {
+                        "skip": false,
+                        "product": "Originium Shard",
+                        "operators": [
+                            "怒潮凛冬",
+                            "褐果",
+                            "食铁兽"
+                        ],
+                        "sort": false,
+                        "autofill": false
+                    },
+                    {
+                        "skip": false,
+                        "product": "Pure Gold",
+                        "operators": [
+                            "引星棘刺",
+                            "清流",
+                            "苍苔"
+                        ],
+                        "sort": false,
+                        "autofill": false
+                    },
+                    {
+                        "skip": false,
+                        "product": "Pure Gold",
+                        "operators": [
+                            "多萝西",
+                            "淬羽赫默",
+                            "温米"
+                        ],
+                        "sort": false,
+                        "autofill": false
+                    }
+                ],
+                "power": [
+                    {
+                        "skip": false,
+                        "operators": [
+                            "伊芙利特",
+                            "深靛",
+                            "澄闪"
+                        ],
+                        "sort": false,
+                        "autofill": false
+                    },
+                    {
+                        "skip": false,
+                        "operators": [
+                            "天空盒",
+                            "海霓",
+                            "炎狱炎熔"
+                        ],
+                        "sort": false,
+                        "autofill": false
+                    },
+                    {
+                        "skip": false,
+                        "operators": [
+                            "CONFESS-47",
+                            "Friston-3",
+                            "GALLUS²"
+                        ],
+                        "sort": false,
+                        "autofill": false
+                    }
+                ],
+                "control": [
+                    {
+                        "skip": false,
+                        "operators": [
+                            "阿米娅",
+                            "凯尔希",
+                            "令",
+                            "重岳",
+                            "维什戴尔"
+                        ],
+                        "sort": false,
+                        "autofill": false
+                    }
+                ],
+                "meeting": [
+                    {
+                        "skip": false,
+                        "operators": [
+                            "余",
+                            "望"
+                        ],
+                        "sort": false,
+                        "autofill": false
+                    }
+                ],
+                "hire": [
+                    {
+                        "skip": false,
+                        "operators": [
+                            "斥罪"
+                        ],
+                        "sort": false,
+                        "autofill": false
+                    }
+                ],
+                "processing": [
+                    {
+                        "skip": false,
+                        "operators": [
+                            "黍"
+                        ],
+                        "sort": false,
+                        "autofill": false
+                    }
+                ],
+                "dormitory": [
+                    {
+                        "skip": false,
+                        "operators": [
+                            "菲亚梅塔",
+                            "伊内丝",
+                            "协律",
+                            "安哲拉",
+                            "红"
+                        ],
+                        "sort": true,
+                        "autofill": false
+                    },
+                    {
+                        "skip": false,
+                        "operators": [
+                            "杜林",
+                            "阿罗玛",
+                            "深海色",
+                            "幽灵鲨",
+                            "烈夏"
+                        ],
+                        "sort": false,
+                        "autofill": false
+                    },
+                    {
+                        "skip": false,
+                        "operators": [
+                            "车尔尼",
+                            "但书",
+                            "戴菲恩",
+                            "PhonoR-0",
+                            "迷迭香"
+                        ],
+                        "sort": false,
+                        "autofill": false
+                    },
+                    {
+                        "skip": false,
+                        "operators": [
+                            "爱丽丝",
+                            "跃跃",
+                            "地灵",
+                            "阿消",
+                            "烛煌"
+                        ],
+                        "sort": false,
+                        "autofill": false
+                    }
+                ]
+            }
+        },
+        {
+            "name": "第02班（04:00-08:00）",
+            "description": "合成玉最大化 · 赤金不得净亏（净≥0） · 碎片产能 ≥ 玉站消化｜贸易站加速",
+            "description_post": "",
+            "Fiammetta": {
+                "enable": false,
+                "target": "",
+                "order": "pre"
+            },
+            "drones": {
+                "enable": true,
+                "room": "trading",
+                "index": 3,
+                "order": "pre"
+            },
+            "rooms": {
+                "trading": [
+                    {
+                        "skip": false,
+                        "product": "Orundum",
+                        "operators": [
+                            "乌有",
+                            "但书",
+                            "佩佩"
+                        ],
+                        "sort": false,
+                        "autofill": false
+                    },
+                    {
+                        "skip": false,
+                        "product": "LMD",
+                        "operators": [
+                            "安哲拉",
+                            "幽灵鲨",
+                            "异客"
+                        ],
+                        "sort": false,
+                        "autofill": false
+                    },
+                    {
+                        "skip": false,
+                        "product": "LMD",
+                        "operators": [
+                            "可露希尔",
+                            "桑葚",
+                            "森西"
+                        ],
+                        "sort": false,
+                        "autofill": false
+                    }
+                ],
+                "manufacture": [
+                    {
+                        "skip": false,
+                        "product": "Originium Shard",
+                        "operators": [
+                            "地灵",
+                            "弑君者",
+                            "断罪者"
+                        ],
+                        "sort": false,
+                        "autofill": false
+                    },
+                    {
+                        "skip": false,
+                        "product": "Pure Gold",
+                        "operators": [
+                            "烈夏",
+                            "砾",
+                            "阿罗玛"
+                        ],
+                        "sort": false,
+                        "autofill": false
+                    },
+                    {
+                        "skip": false,
+                        "product": "Pure Gold",
+                        "operators": [
+                            "迷迭香",
+                            "黑键",
+                            "Castle-3"
+                        ],
+                        "sort": false,
+                        "autofill": false
+                    }
+                ],
+                "power": [
+                    {
+                        "skip": false,
+                        "operators": [
+                            "承曦格雷伊",
+                            "时隙",
+                            "格雷伊"
+                        ],
+                        "sort": false,
+                        "autofill": false
+                    },
+                    {
+                        "skip": false,
+                        "operators": [
+                            "烛煌",
+                            "阿消",
+                            "雷蛇"
+                        ],
+                        "sort": false,
+                        "autofill": false
+                    },
+                    {
+                        "skip": false,
+                        "operators": [
+                            "PhonoR-0",
+                            "协律",
+                            "埃癸斯"
+                        ],
+                        "sort": false,
+                        "autofill": false
+                    }
+                ],
+                "control": [
+                    {
+                        "skip": false,
+                        "operators": [
+                            "阿米娅",
+                            "凯尔希",
+                            "夕",
+                            "电弧",
+                            "重岳"
+                        ],
+                        "sort": false,
+                        "autofill": false
+                    }
+                ],
+                "meeting": [
+                    {
+                        "skip": false,
+                        "operators": [
+                            "伊内丝",
+                            "红"
+                        ],
+                        "sort": false,
+                        "autofill": false
+                    }
+                ],
+                "hire": [
+                    {
+                        "skip": false,
+                        "operators": [
+                            "遥"
+                        ],
+                        "sort": false,
+                        "autofill": false
+                    }
+                ],
+                "processing": [
+                    {
+                        "skip": false,
+                        "operators": [
+                            "深海色"
+                        ],
+                        "sort": false,
+                        "autofill": false
+                    }
+                ],
+                "dormitory": [
+                    {
+                        "skip": false,
+                        "operators": [
+                            "菲亚梅塔",
+                            "望",
+                            "余",
+                            "黍",
+                            "斥罪"
+                        ],
+                        "sort": true,
+                        "autofill": false
+                    },
+                    {
+                        "skip": false,
+                        "operators": [
+                            "杜林",
+                            "温米",
+                            "令",
+                            "海蒂",
+                            "摩根"
+                        ],
+                        "sort": false,
+                        "autofill": false
+                    },
+                    {
+                        "skip": false,
+                        "operators": [
+                            "车尔尼",
+                            "伊芙利特",
+                            "食铁兽",
+                            "苍苔",
+                            "焰影苇草"
+                        ],
+                        "sort": false,
+                        "autofill": false
+                    },
+                    {
+                        "skip": false,
+                        "operators": [
+                            "爱丽丝",
+                            "机械师",
+                            "多萝西",
+                            "陈",
+                            "澄闪"
+                        ],
+                        "sort": false,
+                        "autofill": false
+                    }
+                ]
+            }
+        },
+        {
+            "name": "第03班（08:00-12:00）",
+            "description": "合成玉最大化 · 赤金不得净亏（净≥0） · 碎片产能 ≥ 玉站消化｜制造站加速",
+            "description_post": "",
+            "Fiammetta": {
+                "enable": false,
+                "target": "",
+                "order": "pre"
+            },
+            "drones": {
+                "enable": true,
+                "room": "manufacture",
+                "index": 3,
+                "order": "pre"
+            },
+            "rooms": {
+                "trading": [
+                    {
+                        "skip": false,
+                        "product": "Orundum",
+                        "operators": [
+                            "德克萨斯",
+                            "拉普兰德",
+                            "海蒂"
+                        ],
+                        "sort": false,
+                        "autofill": false
+                    },
+                    {
+                        "skip": false,
+                        "product": "LMD",
+                        "operators": [
+                            "能天使",
+                            "蕾缪安",
+                            "衡沙"
+                        ],
+                        "sort": false,
+                        "autofill": false
+                    },
+                    {
+                        "skip": false,
+                        "product": "LMD",
+                        "operators": [
+                            "鸿雪",
+                            "麒麟R夜刀",
+                            "U-Official"
+                        ],
+                        "sort": false,
+                        "autofill": false
+                    }
+                ],
+                "manufacture": [
+                    {
+                        "skip": false,
+                        "product": "Originium Shard",
+                        "operators": [
+                            "怒潮凛冬",
+                            "褐果",
+                            "食铁兽"
+                        ],
+                        "sort": false,
+                        "autofill": false
+                    },
+                    {
+                        "skip": false,
+                        "product": "Pure Gold",
+                        "operators": [
+                            "引星棘刺",
+                            "清流",
+                            "苍苔"
+                        ],
+                        "sort": false,
+                        "autofill": false
+                    },
+                    {
+                        "skip": false,
+                        "product": "Pure Gold",
+                        "operators": [
+                            "多萝西",
+                            "淬羽赫默",
+                            "温米"
+                        ],
+                        "sort": false,
+                        "autofill": false
+                    }
+                ],
+                "power": [
+                    {
+                        "skip": false,
+                        "operators": [
+                            "伊芙利特",
+                            "深靛",
+                            "澄闪"
+                        ],
+                        "sort": false,
+                        "autofill": false
+                    },
+                    {
+                        "skip": false,
+                        "operators": [
+                            "天空盒",
+                            "海霓",
+                            "炎狱炎熔"
+                        ],
+                        "sort": false,
+                        "autofill": false
+                    },
+                    {
+                        "skip": false,
+                        "operators": [
+                            "CONFESS-47",
+                            "Friston-3",
+                            "GALLUS²"
+                        ],
+                        "sort": false,
+                        "autofill": false
+                    }
+                ],
+                "control": [
+                    {
+                        "skip": false,
+                        "operators": [
+                            "逻各斯",
+                            "机械师",
+                            "令",
+                            "陈",
+                            "维什戴尔"
+                        ],
+                        "sort": false,
+                        "autofill": false
+                    }
+                ],
+                "meeting": [
+                    {
+                        "skip": false,
+                        "operators": [
+                            "余",
+                            "望"
+                        ],
+                        "sort": false,
+                        "autofill": false
+                    }
+                ],
+                "hire": [
+                    {
+                        "skip": false,
+                        "operators": [
+                            "斥罪"
+                        ],
+                        "sort": false,
+                        "autofill": false
+                    }
+                ],
+                "processing": [
+                    {
+                        "skip": false,
+                        "operators": [
+                            "黍"
+                        ],
+                        "sort": false,
+                        "autofill": false
+                    }
+                ],
+                "dormitory": [
+                    {
+                        "skip": false,
+                        "operators": [
+                            "菲亚梅塔",
+                            "重岳",
+                            "凯尔希",
+                            "阿米娅",
+                            "可露希尔"
+                        ],
+                        "sort": true,
+                        "autofill": false
+                    },
+                    {
+                        "skip": false,
+                        "operators": [
+                            "杜林",
+                            "埃癸斯",
+                            "砾",
+                            "承曦格雷伊",
+                            "乌有"
+                        ],
+                        "sort": false,
+                        "autofill": false
+                    },
+                    {
+                        "skip": false,
+                        "operators": [
+                            "车尔尼",
+                            "雷蛇",
+                            "时隙",
+                            "遥",
+                            "夕"
+                        ],
+                        "sort": false,
+                        "autofill": false
+                    },
+                    {
+                        "skip": false,
+                        "operators": [
+                            "爱丽丝",
+                            "黑键",
+                            "格雷伊",
+                            "弑君者",
+                            "桑葚"
+                        ],
+                        "sort": false,
+                        "autofill": false
+                    }
+                ]
+            }
+        },
+        {
+            "name": "第04班（12:00-16:00）",
+            "description": "合成玉最大化 · 赤金不得净亏（净≥0） · 碎片产能 ≥ 玉站消化｜贸易站加速",
+            "description_post": "",
+            "Fiammetta": {
+                "enable": false,
+                "target": "",
+                "order": "pre"
+            },
+            "drones": {
+                "enable": true,
+                "room": "manufacture",
+                "index": 3,
+                "order": "pre"
+            },
+            "rooms": {
+                "trading": [
+                    {
+                        "skip": false,
+                        "product": "Orundum",
+                        "operators": [
+                            "乌有",
+                            "但书",
+                            "佩佩"
+                        ],
+                        "sort": false,
+                        "autofill": false
+                    },
+                    {
+                        "skip": false,
+                        "product": "LMD",
+                        "operators": [
+                            "安哲拉",
+                            "幽灵鲨",
+                            "异客"
+                        ],
+                        "sort": false,
+                        "autofill": false
+                    },
+                    {
+                        "skip": false,
+                        "product": "LMD",
+                        "operators": [
+                            "可露希尔",
+                            "桑葚",
+                            "森西"
+                        ],
+                        "sort": false,
+                        "autofill": false
+                    }
+                ],
+                "manufacture": [
+                    {
+                        "skip": false,
+                        "product": "Originium Shard",
+                        "operators": [
+                            "地灵",
+                            "弑君者",
+                            "断罪者"
+                        ],
+                        "sort": false,
+                        "autofill": false
+                    },
+                    {
+                        "skip": false,
+                        "product": "Pure Gold",
+                        "operators": [
+                            "烈夏",
+                            "砾",
+                            "阿罗玛"
+                        ],
+                        "sort": false,
+                        "autofill": false
+                    },
+                    {
+                        "skip": false,
+                        "product": "Pure Gold",
+                        "operators": [
+                            "迷迭香",
+                            "黑键",
+                            "Castle-3"
+                        ],
+                        "sort": false,
+                        "autofill": false
+                    }
+                ],
+                "power": [
+                    {
+                        "skip": false,
+                        "operators": [
+                            "承曦格雷伊",
+                            "时隙",
+                            "格雷伊"
+                        ],
+                        "sort": false,
+                        "autofill": false
+                    },
+                    {
+                        "skip": false,
+                        "operators": [
+                            "烛煌",
+                            "阿消",
+                            "雷蛇"
+                        ],
+                        "sort": false,
+                        "autofill": false
+                    },
+                    {
+                        "skip": false,
+                        "operators": [
+                            "PhonoR-0",
+                            "协律",
+                            "埃癸斯"
+                        ],
+                        "sort": false,
+                        "autofill": false
+                    }
+                ],
+                "control": [
+                    {
+                        "skip": false,
+                        "operators": [
+                            "阿米娅",
+                            "凯尔希",
+                            "夕",
+                            "电弧",
+                            "重岳"
+                        ],
+                        "sort": false,
+                        "autofill": false
+                    }
+                ],
+                "meeting": [
+                    {
+                        "skip": false,
+                        "operators": [
+                            "伊内丝",
+                            "红"
+                        ],
+                        "sort": false,
+                        "autofill": false
+                    }
+                ],
+                "hire": [
+                    {
+                        "skip": false,
+                        "operators": [
+                            "遥"
+                        ],
+                        "sort": false,
+                        "autofill": false
+                    }
+                ],
+                "processing": [
+                    {
+                        "skip": false,
+                        "operators": [
+                            "深海色"
+                        ],
+                        "sort": false,
+                        "autofill": false
+                    }
+                ],
+                "dormitory": [
+                    {
+                        "skip": false,
+                        "operators": [
+                            "菲亚梅塔",
+                            "逻各斯",
+                            "CONFESS-47",
+                            "GALLUS²",
+                            "拉普兰德"
+                        ],
+                        "sort": true,
+                        "autofill": false
+                    },
+                    {
+                        "skip": false,
+                        "operators": [
+                            "杜林",
+                            "深靛",
+                            "炎狱炎熔",
+                            "维什戴尔",
+                            "麒麟R夜刀"
+                        ],
+                        "sort": false,
+                        "autofill": false
+                    },
+                    {
+                        "skip": false,
+                        "operators": [
+                            "车尔尼",
+                            "U-Official",
+                            "褐果",
+                            "清流",
+                            "海霓"
+                        ],
+                        "sort": false,
+                        "autofill": false
+                    },
+                    {
+                        "skip": false,
+                        "operators": [
+                            "爱丽丝",
+                            "淬羽赫默",
+                            "Friston-3",
+                            "鸿雪",
+                            "衡沙"
+                        ],
+                        "sort": false,
+                        "autofill": false
+                    }
+                ]
+            }
+        },
+        {
+            "name": "第05班（16:00-20:00）",
+            "description": "合成玉最大化 · 赤金不得净亏（净≥0） · 碎片产能 ≥ 玉站消化｜制造站加速",
+            "description_post": "",
+            "Fiammetta": {
+                "enable": false,
+                "target": "",
+                "order": "pre"
+            },
+            "drones": {
+                "enable": true,
+                "room": "manufacture",
+                "index": 3,
+                "order": "pre"
+            },
+            "rooms": {
+                "trading": [
+                    {
+                        "skip": false,
+                        "product": "Orundum",
+                        "operators": [
+                            "德克萨斯",
+                            "拉普兰德",
+                            "海蒂"
+                        ],
+                        "sort": false,
+                        "autofill": false
+                    },
+                    {
+                        "skip": false,
+                        "product": "LMD",
+                        "operators": [
+                            "能天使",
+                            "蕾缪安",
+                            "衡沙"
+                        ],
+                        "sort": false,
+                        "autofill": false
+                    },
+                    {
+                        "skip": false,
+                        "product": "LMD",
+                        "operators": [
+                            "鸿雪",
+                            "麒麟R夜刀",
+                            "U-Official"
+                        ],
+                        "sort": false,
+                        "autofill": false
+                    }
+                ],
+                "manufacture": [
+                    {
+                        "skip": false,
+                        "product": "Originium Shard",
+                        "operators": [
+                            "怒潮凛冬",
+                            "褐果",
+                            "食铁兽"
+                        ],
+                        "sort": false,
+                        "autofill": false
+                    },
+                    {
+                        "skip": false,
+                        "product": "Pure Gold",
+                        "operators": [
+                            "引星棘刺",
+                            "清流",
+                            "苍苔"
+                        ],
+                        "sort": false,
+                        "autofill": false
+                    },
+                    {
+                        "skip": false,
+                        "product": "Pure Gold",
+                        "operators": [
+                            "多萝西",
+                            "淬羽赫默",
+                            "温米"
+                        ],
+                        "sort": false,
+                        "autofill": false
+                    }
+                ],
+                "power": [
+                    {
+                        "skip": false,
+                        "operators": [
+                            "伊芙利特",
+                            "深靛",
+                            "澄闪"
+                        ],
+                        "sort": false,
+                        "autofill": false
+                    },
+                    {
+                        "skip": false,
+                        "operators": [
+                            "天空盒",
+                            "海霓",
+                            "炎狱炎熔"
+                        ],
+                        "sort": false,
+                        "autofill": false
+                    },
+                    {
+                        "skip": false,
+                        "operators": [
+                            "CONFESS-47",
+                            "Friston-3",
+                            "GALLUS²"
+                        ],
+                        "sort": false,
+                        "autofill": false
+                    }
+                ],
+                "control": [
+                    {
+                        "skip": false,
+                        "operators": [
+                            "阿米娅",
+                            "凯尔希",
+                            "令",
+                            "重岳",
+                            "维什戴尔"
+                        ],
+                        "sort": false,
+                        "autofill": false
+                    }
+                ],
+                "meeting": [
+                    {
+                        "skip": false,
+                        "operators": [
+                            "余",
+                            "望"
+                        ],
+                        "sort": false,
+                        "autofill": false
+                    }
+                ],
+                "hire": [
+                    {
+                        "skip": false,
+                        "operators": [
+                            "斥罪"
+                        ],
+                        "sort": false,
+                        "autofill": false
+                    }
+                ],
+                "processing": [
+                    {
+                        "skip": false,
+                        "operators": [
+                            "黍"
+                        ],
+                        "sort": false,
+                        "autofill": false
+                    }
+                ],
+                "dormitory": [
+                    {
+                        "skip": false,
+                        "operators": [
+                            "菲亚梅塔",
+                            "电弧",
+                            "Castle-3",
+                            "异客",
+                            "断罪者"
+                        ],
+                        "sort": true,
+                        "autofill": false
+                    },
+                    {
+                        "skip": false,
+                        "operators": [
+                            "杜林",
+                            "伊内丝",
+                            "协律",
+                            "安哲拉",
+                            "红"
+                        ],
+                        "sort": false,
+                        "autofill": false
+                    },
+                    {
+                        "skip": false,
+                        "operators": [
+                            "车尔尼",
+                            "佩佩",
+                            "森西",
+                            "阿罗玛",
+                            "但书"
+                        ],
+                        "sort": false,
+                        "autofill": false
+                    },
+                    {
+                        "skip": false,
+                        "operators": [
+                            "爱丽丝",
+                            "深海色",
+                            "PhonoR-0",
+                            "迷迭香",
+                            "幽灵鲨"
+                        ],
+                        "sort": false,
+                        "autofill": false
+                    }
+                ]
+            }
+        },
+        {
+            "name": "第06班（20:00-24:00）",
+            "description": "合成玉最大化 · 赤金不得净亏（净≥0） · 碎片产能 ≥ 玉站消化｜贸易站加速",
+            "description_post": "",
+            "Fiammetta": {
+                "enable": false,
+                "target": "",
+                "order": "pre"
+            },
+            "drones": {
+                "enable": true,
+                "room": "manufacture",
+                "index": 3,
+                "order": "pre"
+            },
+            "rooms": {
+                "trading": [
+                    {
+                        "skip": false,
+                        "product": "Orundum",
+                        "operators": [
+                            "乌有",
+                            "但书",
+                            "佩佩"
+                        ],
+                        "sort": false,
+                        "autofill": false
+                    },
+                    {
+                        "skip": false,
+                        "product": "LMD",
+                        "operators": [
+                            "安哲拉",
+                            "幽灵鲨",
+                            "异客"
+                        ],
+                        "sort": false,
+                        "autofill": false
+                    },
+                    {
+                        "skip": false,
+                        "product": "LMD",
+                        "operators": [
+                            "可露希尔",
+                            "桑葚",
+                            "森西"
+                        ],
+                        "sort": false,
+                        "autofill": false
+                    }
+                ],
+                "manufacture": [
+                    {
+                        "skip": false,
+                        "product": "Originium Shard",
+                        "operators": [
+                            "地灵",
+                            "弑君者",
+                            "断罪者"
+                        ],
+                        "sort": false,
+                        "autofill": false
+                    },
+                    {
+                        "skip": false,
+                        "product": "Pure Gold",
+                        "operators": [
+                            "烈夏",
+                            "砾",
+                            "阿罗玛"
+                        ],
+                        "sort": false,
+                        "autofill": false
+                    },
+                    {
+                        "skip": false,
+                        "product": "Pure Gold",
+                        "operators": [
+                            "迷迭香",
+                            "黑键",
+                            "Castle-3"
+                        ],
+                        "sort": false,
+                        "autofill": false
+                    }
+                ],
+                "power": [
+                    {
+                        "skip": false,
+                        "operators": [
+                            "承曦格雷伊",
+                            "时隙",
+                            "格雷伊"
+                        ],
+                        "sort": false,
+                        "autofill": false
+                    },
+                    {
+                        "skip": false,
+                        "operators": [
+                            "烛煌",
+                            "阿消",
+                            "雷蛇"
+                        ],
+                        "sort": false,
+                        "autofill": false
+                    },
+                    {
+                        "skip": false,
+                        "operators": [
+                            "PhonoR-0",
+                            "协律",
+                            "埃癸斯"
+                        ],
+                        "sort": false,
+                        "autofill": false
+                    }
+                ],
+                "control": [
+                    {
+                        "skip": false,
+                        "operators": [
+                            "摩根",
+                            "戴菲恩",
+                            "跃跃",
+                            "电弧",
+                            "焰影苇草"
+                        ],
+                        "sort": false,
+                        "autofill": false
+                    }
+                ],
+                "meeting": [
+                    {
+                        "skip": false,
+                        "operators": [
+                            "伊内丝",
+                            "红"
+                        ],
+                        "sort": false,
+                        "autofill": false
+                    }
+                ],
+                "hire": [
+                    {
+                        "skip": false,
+                        "operators": [
+                            "遥"
+                        ],
+                        "sort": false,
+                        "autofill": false
+                    }
+                ],
+                "processing": [
+                    {
+                        "skip": false,
+                        "operators": [
+                            "深海色"
+                        ],
+                        "sort": false,
+                        "autofill": false
+                    }
+                ],
+                "dormitory": [
+                    {
+                        "skip": false,
+                        "operators": [
+                            "菲亚梅塔",
+                            "重岳",
+                            "凯尔希",
+                            "阿米娅",
+                            "引星棘刺"
+                        ],
+                        "sort": true,
+                        "autofill": false
+                    },
+                    {
+                        "skip": false,
+                        "operators": [
+                            "杜林",
+                            "能天使",
+                            "德克萨斯",
+                            "蕾缪安",
+                            "天空盒"
+                        ],
+                        "sort": false,
+                        "autofill": false
+                    },
+                    {
+                        "skip": false,
+                        "operators": [
+                            "车尔尼",
+                            "怒潮凛冬",
+                            "望",
+                            "余",
+                            "黍"
+                        ],
+                        "sort": false,
+                        "autofill": false
+                    },
+                    {
+                        "skip": false,
+                        "operators": [
+                            "爱丽丝",
+                            "斥罪",
+                            "令",
+                            "温米",
+                            "夕"
+                        ],
+                        "sort": false,
+                        "autofill": false
+                    }
+                ]
+            }
+        }
+    ]
+}

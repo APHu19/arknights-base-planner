@@ -1,0 +1,29 @@
+# 根目录白名单策略：只放行真正的项目文件，其余（历史 probe/engine 脚本、中间 json、旧排班产物）一律不入库
+/*
+!/.gitignore
+!/README.md
+!/HANDOFF.md
+!/全机制.md
+!/后勤技能一览带注释.md
+!/Arknights_OperBox_Export.json
+!/启动基建排班器.bat
+!/快速出表.bat
+!/planner/
+
+# planner 内部排除
+planner/__pycache__/
+planner/**/__pycache__/
+planner/gui/config.json
+planner/_bak_*/
+_backup_*/
+_raw/
+_tiles/
+__pycache__/
+*.pyc
+~$*
+
+# 说明（不改上面的规则，仅备忘）：
+#  · _raw/building_data.json、_raw/character_table.json 体积大且属游戏方数据 → 不入库，
+#    需要重抽 phases.json 时放回 _raw/ 再跑 planner/data/extract_phases.py
+#  · Arknights_OperBox_Export.json 含个人干员池 → 仓库请保持 Private；
+#    若要公开：把它加入忽略并从版本库移除（git rm --cached Arknights_OperBox_Export.json）
