@@ -287,9 +287,10 @@ class App(tk.Tk):
         rowp = ttk.Frame(bottom); rowp.pack(anchor='w', pady=3)
         ttk.Label(rowp, text='固定房间合计耗电：').pack(side='left')
         self.other_var = tk.StringVar(value=str(self.st.get('other_power', 450)))
-        ttk.Combobox(rowp, textvariable=self.other_var, width=6, state='readonly',
+        ttk.Combobox(rowp, textvariable=self.other_var, width=22, state='readonly',
                      values=['450', '190']).pack(side='left')
         ttk.Label(bottom, text='电力规则：发电站 Ⅰ/Ⅱ/Ⅲ = 60/130/270；制造·贸易 Ⅰ/Ⅱ/Ⅲ = 10/30/60；'
+                               '450 = 含 4 间宿舍（界面口径）／190 = 文档口径（宿舍不计，求解按这个算）；'
                                '非三级制造站只能产赤金（选碎片/经验会自动回到赤金）').pack(anchor='w', pady=4)
         self.render_grid()
 
@@ -348,8 +349,11 @@ class App(tk.Tk):
                 self.prod_boxes[i].set('—' if room != '空' else '')
         supply, consume, net = ST.power(self.grid_cells, float(self.other_var.get()))
         ok = net >= 0
+        doc_net = net + (float(self.other_var.get()) - 190.0)   # 求解器按文档口径 190 计
+        hint = ('' if ok else f'　（游戏内无法运转；求解仍按文档口径 190 → 净 {doc_net:+.0f}，'
+                              f'可点"开始求解"确认后继续）')
         self.power_lbl.config(text=f'电力：供 {supply} ／ 耗 {consume:.0f} ／ 净 {net:+.0f}　'
-                                   f'{"✔ 可正常运行" if ok else "✘ 电力不足，无法运行（给制造/贸易站降级或加发电站）"}',
+                                   f'{"✔ 可正常运行" if ok else "✘ 电力不足"}{hint}',
                               foreground='#1a7f37' if ok else '#c0392b')
 
     # ================================================== ③ 班次与目标
@@ -694,8 +698,15 @@ class App(tk.Tk):
         cfg = ST.grid_to_cfg(self.grid_cells)
         supply, consume, net = ST.power(self.grid_cells, float(self.other_var.get()))
         if net < 0:
-            messagebox.showerror('电力不足', f'供 {supply} / 耗 {consume:.0f} / 净 {net:+.0f}，请先调整九宫格。')
-            return
+            doc_net = net + (float(self.other_var.get()) - 190.0)
+            if not messagebox.askyesno(
+                    '电力不足（界面口径）',
+                    f'按界面口径：供 {supply} / 耗 {consume:.0f} / 净 {net:+.0f} ✘\n\n'
+                    f'求解器按**文档口径**（固定房间 190）算，净 {doc_net:+.0f}。\n'
+                    f'要按文档口径继续求解吗？（想按界面口径就必须加发电站或给制造/贸易站降级）'):
+                return
+            self.logln(f'[电力] 界面口径(固定房间 {self.other_var.get()}) 净 {net:+.0f}；'
+                       f'求解按文档口径 190 计，净 {doc_net:+.0f}')
         self.run_btn.config(state='disabled')
         self.pbar.config(value=3); self.pbar_lbl.config(text='[进度] 3% 启动中…')
         self.result = None
