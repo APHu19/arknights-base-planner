@@ -208,16 +208,23 @@ class App(tk.Tk):
     def _tab_shift(self):
         f = ttk.Frame(self.nb); self.nb.add(f, text='③ 班次与目标')
         left = ttk.Frame(f); left.pack(side='left', fill='both', expand=True, padx=8, pady=8)
-        ttk.Label(left, text='班次（默认 6 班 4h；新建时开始时间 = 上一班结束，结束自动生成）').pack(anchor='w')
-        self.shift_lb = tk.Listbox(left, height=12)
+        ttk.Label(left, text='班次表（由开始时间定义；结束时间 = 下一班开始 − 1 分钟，自动生成）',
+                  font=('Microsoft YaHei', 10, 'bold')).pack(anchor='w')
+        self.shift_lb = tk.Listbox(left, height=12, font=('Consolas', 10))
         self.shift_lb.pack(fill='both', expand=True, pady=4)
         row = ttk.Frame(left); row.pack(fill='x')
-        ttk.Button(row, text='新建班次', command=self.add_shift).pack(side='left')
-        ttk.Button(row, text='删除选中', command=self.del_shift).pack(side='left', padx=6)
-        ttk.Label(left, text='时长(h)：').pack(anchor='w', pady=(8, 0))
-        self.dur_var = tk.StringVar(value='4')
-        ttk.Combobox(left, textvariable=self.dur_var, values=['2', '3', '4', '6', '8', '12'],
-                     width=6, state='readonly').pack(anchor='w')
+        ttk.Label(row, text='开始时间 HH:MM：').pack(side='left')
+        self.new_start_var = tk.StringVar()
+        ttk.Entry(row, textvariable=self.new_start_var, width=8).pack(side='left', padx=3)
+        self.add_btn = ttk.Button(row, text='新建第 3 班', command=self.add_shift)
+        self.add_btn.pack(side='left', padx=4)
+        row2 = ttk.Frame(left); row2.pack(fill='x', pady=3)
+        ttk.Button(row2, text='删除选中', command=self.del_shift).pack(side='left')
+        ttk.Button(row2, text='把选中班改为上面的开始时间',
+                   command=self.edit_shift).pack(side='left', padx=6)
+        ttk.Button(row2, text='恢复默认 6×4h', command=self.reset_shifts).pack(side='left')
+        self.shift_info = ttk.Label(left, text='', wraplength=340, foreground='#444', justify='left')
+        self.shift_info.pack(anchor='w', pady=(6, 0))
 
         right = ttk.Frame(f); right.pack(side='left', fill='both', expand=True, padx=8, pady=8)
         ttk.Label(right, text='本次要求（四个维度任意组合）').pack(anchor='w')
@@ -278,33 +285,133 @@ class App(tk.Tk):
         except Exception as e:
             self.obj_desc.config(text=f'组合无效：{e}')
 
-    def render_shifts(self):
-        self.shift_lb.delete(0, 'end')
-        for i, s in enumerate(self.st['shifts'], 1):
-            self.shift_lb.insert('end', f'第{i}班  {s["start"]} - {s["end"]}')
-
-    def _next_start(self):
-        if not self.st['shifts']: return '00:00'
-        return self.st['shifts'][-1]['end']
-
+    # ---- 班次表：由「开始时间」定义，结束时间 = 下一班开始 − 1 分钟（闭环） ----
     @staticmethod
     def _add_minutes(hhmm, minutes):
-        h, m = map(int, hhmm.split(':'))
-        t = (h * 60 + m + minutes) % (24 * 60)
+        h, m = map(int, str(hhmm).split(':'))
+        t = (h * 60 + m + int(minutes)) % (24 * 60)
         return f'{t // 60:02d}:{t % 60:02d}'
 
+    @staticmethod
+    def _mins(hhmm):
+        h, m = map(int, str(hhmm).split(':'))
+        return h * 60 + m
+
+    def _recalc_shifts(self):
+        """结束时间 = 下一班开始 − 1 分钟；最后一班回到第一班（闭环）。"""
+        sh = self.st['shifts']
+        n = len(sh)
+        for i, s in enumerate(sh):
+            if n >= 2:
+                s['end'] = self._add_minutes(sh[(i + 1) % n]['start'], -1)
+            else:
+                s['end'] = self._add_minutes(s['start'], 240)
+
+    def _table(self):
+        """→ (core.shiftplan 班次表 | None, 错误信息)"""
+        from core import shiftplan as SP
+        starts = [s['start'] for s in self.st['shifts']]
+        try:
+            return SP.build_table(starts), ''
+        except Exception as e:
+            return None, str(e)
+
+    def render_shifts(self):
+        self._recalc_shifts()
+        self.shift_lb.delete(0, 'end')
+        tbl, err = self._table()
+        for i, s in enumerate(self.st['shifts'], 1):
+            dur = (self._mins(self._add_minutes(s['end'], 1)) - self._mins(s['start'])) % 1440
+            self.shift_lb.insert('end', f'第{i}班   {s["start"]} - {s["end"]}   {dur / 60:g}h')
+        if hasattr(self, 'add_btn'):
+            self.add_btn.config(text=f'新建第 {len(self.st["shifts"]) + 1} 班')
+        if hasattr(self, 'new_start_var'):
+            self.new_start_var.set(self._suggest_start())
+        if hasattr(self, 'shift_info'):
+            from core import shiftplan as SP
+            if err:
+                self.shift_info.config(text=f'⚠ {err}（求解会拒绝，请先改好）', foreground='#a00')
+            else:
+                self.shift_info.config(
+                    text=f'{SP.summary(tbl)}\n合计 {SP.total_minutes(tbl)} 分钟（= 整天）；'
+                         f'界面上结束时间按"下一班开始 − 1 分钟"显示，计算与 MAA 输出按整点连续区间。',
+                    foreground='#444')
+
+    def _suggest_start(self):
+        """新建班的建议开始时间：把**最长的那一班**对半切开（最自然）。"""
+        sh = sorted(self.st['shifts'], key=lambda s: self._mins(s['start']))
+        if len(sh) < 2:
+            return '00:00'
+        best, span = None, -1
+        for i, s in enumerate(sh):
+            nxt = sh[(i + 1) % len(sh)]['start']
+            d = (self._mins(nxt) - self._mins(s['start'])) % 1440
+            if d > span:
+                best, span = s['start'], d
+        return self._add_minutes(best, span // 2)
+
+    def _sort_cycle(self):
+        """保持"第一班"不动，其余按顺时针顺序排（保证 MAA 的 period 连续）。"""
+        sh = self.st['shifts']
+        if len(sh) < 2:
+            return
+        anchor = self._mins(sh[0]['start'])
+        rest = sorted(sh[1:], key=lambda s: (self._mins(s['start']) - anchor) % 1440)
+        self.st['shifts'] = [sh[0]] + rest
+
     def add_shift(self):
-        try: dur = int(float(self.dur_var.get()) * 60)
-        except Exception: dur = 240
-        start = self._next_start()
-        end = self._add_minutes(start, dur)
-        self.st['shifts'].append({'start': start, 'end': end})
+        from core import shiftplan as SP
+        txt = (self.new_start_var.get() or '').strip()
+        try:
+            SP.parse_hhmm(txt)
+        except Exception as e:
+            messagebox.showwarning('开始时间不合法', str(e))
+            return
+        if any(s['start'] == txt for s in self.st['shifts']):
+            messagebox.showwarning('重复', f'{txt} 已经有一班了')
+            return
+        if len(self.st['shifts']) >= 8:
+            messagebox.showwarning('班次过多', '最多 8 班')
+            return
+        self.st['shifts'].append({'start': txt, 'end': txt})
+        self._sort_cycle()
+        self.render_shifts()
+
+    def edit_shift(self):
+        from core import shiftplan as SP
+        sel = self.shift_lb.curselection()
+        if not sel:
+            messagebox.showinfo('提示', '先在列表里选中要改的那一班')
+            return
+        txt = (self.new_start_var.get() or '').strip()
+        try:
+            SP.parse_hhmm(txt)
+        except Exception as e:
+            messagebox.showwarning('开始时间不合法', str(e))
+            return
+        i = int(sel[0])
+        if any(j != i and s['start'] == txt for j, s in enumerate(self.st['shifts'])):
+            messagebox.showwarning('重复', f'{txt} 已经有一班了')
+            return
+        self.st['shifts'][i]['start'] = txt
+        if i != 0:
+            self._sort_cycle()
         self.render_shifts()
 
     def del_shift(self):
         sel = self.shift_lb.curselection()
-        if not sel: return
-        self.st['shifts'].pop(sel[0])
+        if not sel:
+            return
+        if len(self.st['shifts']) <= 2:
+            messagebox.showwarning('至少两班', '一天至少要有 2 班')
+            return
+        self.st['shifts'].pop(int(sel[0]))
+        self.render_shifts()
+
+    def reset_shifts(self):
+        from gui.state import DEFAULT_SHIFTS
+        import copy
+        self.st['shifts'] = copy.deepcopy(DEFAULT_SHIFTS)
         self.render_shifts()
 
     # ================================================== ④ 求解与结果
@@ -329,10 +436,14 @@ class App(tk.Tk):
         self.hours_var = tk.StringVar(value=str(self.st.get('shift_hours', 4)))
         ttk.Combobox(top, textvariable=self.hours_var, width=5, state='readonly',
                      values=['2', '3', '4', '6', '8', '12']).pack(side='left', padx=3)
+        ttk.Label(top, text='排班路径').pack(side='left')
+        self.sched_var = tk.StringVar(value='window｜窗口排班（判据A，推荐）')
+        ttk.Combobox(top, textvariable=self.sched_var, width=30, state='readonly',
+                     values=['window｜窗口排班（判据A，推荐）', 'ab｜同站A/B整段轮换（旧）']).pack(
+            side='left', padx=3)
         ttk.Label(top, text='爆仓策略').pack(side='left')
         self.storage_var = tk.StringVar(value=self.st.get('storage', 'warn'))
-        ttk.Combobox(top, textvariable=self.storage_var, width=18, state='readonly',
-                     values=['warn｜只告警（默认）', 'clip｜自动降效（剪掉超出）', 'off｜不检查']).pack(side='left', padx=3)
+        ttk.Combobox(top, textvariable=self.storage_var, width=18, state='readonly',                     values=['warn｜只告警（默认）', 'clip｜自动降效（剪掉超出）', 'off｜不检查']).pack(side='left', padx=3)
         self.run_btn = ttk.Button(top, text='开始求解', command=self.start_solve)
         self.run_btn.pack(side='left', padx=8)
         ttk.Button(top, text='导出 MAA 计划…', command=self.export_maa).pack(side='left')
@@ -375,14 +486,22 @@ class App(tk.Tk):
             if self.ge_var.get():
                 o['cons'] = dict(o.get('cons') or {}); o['cons']['shard_ge_trade'] = True
             self._obj = o
+            tbl, err = self._table()
+            if err:
+                messagebox.showwarning('班次表有误', err)
+                self.logln('[错误] 班次表：' + err)
+                return
+            from core import shiftplan as SP
             self.logln(f'[求解] 布局 {sum(len(v) for v in cfg.values())} 间，'
                        f'目标 {o["name"]}，束宽 {self.w_var.get()}')
+            self.logln(f'[班次] {SP.summary(tbl)}')
             r = run(layout=cfg, objective=o, ds=None, box=self.st['box'],
                     width=int(self.w_var.get()), topk=int(self.k_var.get()),
                     rounds=int(self.r_var.get()), days=int(self.d_var.get()),
                     fast=self.fast_var.get(), refine=False, verbose=False,
                     storage=(self.storage_var.get() or 'warn').split('｜')[0],
-                    shift_hours=float(self.hours_var.get() or 4))
+                    shift_hours=float(self.hours_var.get() or 4),
+                    sched=(self.sched_var.get() or 'ab').split('｜')[0], table=tbl)
             self.result = r
             self.logln('[完成] 求解与复核结束')
             self.after(10, lambda: self.show_result(r))

@@ -46,8 +46,10 @@
 不允许常驻（无休息窗口的安排直接排除）
 ```
 **落点**：`solve/schedule.py` **已就位并接线**（`--sched window`；默认 `ab` 不变，见 `SKILL.md §10.1`）。
-**剩下的活**：① 让窗口路径的产量反过来喂给预算修复（或做"贸易站节流"），把赤金净稳在约束内；
-② 若要支持非 4h 班次，需要先扩 `emit/maa.py`（`planTimes`/班次时间标签目前写死 6 班）。
+**自定义班次表已可用**：`--shifts "22:00,10:00,16:00"`（开始时间定义、闭环、可不等长；GUI ③ 页签可点"新建第 N 班"），
+MAA 输出带 `period/duration`、`planTimes='n班'`，见 `SKILL.md §10.2` 与 `probe_shift.py`。
+**剩下的活**：① 12h 长班的稳态余量很薄（最低心情 1.5 vs 下限 1）→ 可调 `STEADY_FLOOR` 或限制最长班；
+② 赤金反馈只在无人机旋钮范围内（±36 赤金/天）有效，超出仍会告警。
 
 **禁动范围**：`core/rules.py`、`core/engine.py`、`core/orders.py`、`emit/maa.py` 的现有行为不要改；
 只允许**新增**文件与**在开关后**改 `plan.py`/`solver.py`。
