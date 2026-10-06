@@ -52,7 +52,7 @@ def _fixed_pools():
 
 
 def build_window_shifts(assign, fixed, ds=None, hours=4.0, policy='steady', park_leads=0,
-                        table=None):
+                        table=None, fia=True):
     """window 路径：把装配结果排成对**判据 A（长期稳态）**可行的一天。
 
     与 ab 路径的区别：不再用"A 组/B 组整段轮换 + 恢复债分寝室"，
@@ -79,11 +79,29 @@ def build_window_shifts(assign, fixed, ds=None, hours=4.0, policy='steady', park
                       targets={i: onduty for i in range(n_shifts)}, table=table)
     res = SCN.schedule_base(st, spec)
     SCN.pack_dorms(st, ds, leads=parked)
+    shifts = SCN.to_shifts(st)
+    # —— 菲亚梅塔：**按班次**决定要不要交换（规则见 solve/fia.py 文件头）——
+    fia_notes = []
+    if fia:
+        try:
+            from solve import fia as FIA
+            dec, fia_notes = FIA.plan_fia(st, ds)
+            for i, d in dec.items():
+                if 0 <= i < len(shifts):
+                    shifts[i]['fia'] = d
+            res['fia'] = dec
+        except Exception as e:                      # 决策失败不影响排班本身
+            fia_notes.append(f'菲亚梅塔决策失败：{e}')
+            res['fia'] = {}
+    else:
+        res['fia'] = {}
+    if fia_notes:
+        res['fia_notes'] = fia_notes
     res['parked'] = parked
     res['spec'] = spec
     res['roster'] = len(st.roster())
     res['onduty'] = onduty
-    return SCN.to_shifts(st), st, res
+    return shifts, st, res
 
 
 def build_shifts(assign, fixed, ds=None, hours=4.0, table=None):

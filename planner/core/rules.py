@@ -42,6 +42,11 @@ RULES = [
          chan='prod_any', expr='g1*fac("发电站")', facility=True),
     dict(id='per_member_any', room='制造站', re=r'每个当前制造站内干员为当前制造站\+(\d+)%生产力',
          chan='prod_any', expr='g1*n_room', facility=True),
+    # ---- 工程机器人（至简·绘图设计，按基建设施总等级；归零时保留）----
+    dict(id='bot16', room='制造站', re=r'每16个工程机器人\+(\d+)%生产力',
+         chan='prod_any', expr='g1*(res("工程机器人")//16)', facility=True),
+    dict(id='bot8', room='制造站', re=r'每8个工程机器人\+(\d+)%生产力',
+         chan='prod_any', expr='g1*(res("工程机器人")//8)', facility=True),
     # ---- 产品指定 ----
     dict(id='gold_flat', room='制造站', re=r'贵金属类配方的生产力\+(\d+)%',
          chan='prod_gold', expr='g1'),
@@ -87,6 +92,9 @@ RULES = [
          chan='order', expr='res("无声共鸣")/2'),
     dict(id='mowu', room='贸易站', re=r'每1点魔物料理\+(\d+)%订单效率',
          chan='order', expr='res("魔物料理")*g1'),
+    dict(id='goldline_per_n', room='贸易站',
+         re=r'每有(\d+)条赤金生产线，则当前贸易站订单获取效率额外\+(\d+)%',
+         chan='order', expr='int(res("赤金生产线")//g1)*g2'),
     dict(id='hongxue', room='贸易站', re=r'每有1条赤金生产线，则当前贸易站订单获取效率\+(\d+)%',
          chan='order', expr='res("赤金生产线")*g1'),
     # ---- 发电站 ----
@@ -160,7 +168,7 @@ def evaluate_room(room, level, product, team, ctx, ds, hours=4.0, morale=None):
     resg = _resolve_resources(ctx, staffed, resg, ds, cur_room=room, cur_team=team)
     env_base = dict(
         n_room=n_room, n_other=n_other, hours=hours,
-        fac=lambda r: ctx.count(r),
+        fac=lambda r: ctx.count(r) + (getattr(ctx, 'fac_bonus', {}) or {}).get(r, 0),
         group=lambda name: sum(1 for o in ctx.staffed if o in _members_of(ds, name)),
         room_group=lambda name: sum(1 for o in team if o in _members_of(ds, name)),
         skills_in_room=lambda kw: sum(1 for op in team for s in ds.skills_of(op, room) if kw in (s.name or '')),

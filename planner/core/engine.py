@@ -85,6 +85,7 @@ class Ctx:
         r.setdefault('人间烟火', 0.0); r.setdefault('感知信息', 0.0); r.setdefault('无声共鸣', 0.0)
         r.setdefault('思维链环', 0.0); r.setdefault('巫术结晶', 0.0); r.setdefault('情报储备', 0.0)
         r.setdefault('热情值', 0.0); r.setdefault('木天蓼', 0.0); r.setdefault('心情落差', 0.0)
+        r.setdefault('工程机器人', 0.0)
         return r
 
 
@@ -267,8 +268,34 @@ def _resolve_resources(ctx, team, res, ds, cur_room=None, cur_team=None):
     if where('令', '控制中枢'): yanhuo += 15                 # 山河远阔（心情>12）
     if where('桑葚', '人力办公室'): yanhuo += OFFICE_EXTRA * 10   # 灾后普查
     yanhuo += 5 * min(5, sui)
+    # ---- 设施数量修正（仅影响设施数量，不算生产力）----
+    #   森蚺·我寻思能行（中枢）：Lancet-2 在发电站 → 发电站额外 +2
+    #   承曦格雷伊·晨曦（发电站）：**其他**发电站没有作业平台 → 发电站额外 +1
+    #   这两条直接决定温蒂/森蚺/清流这些"每个发电站 +X%"技能的收益，之前完全没建模。
+    pw_all = list(by_room.get('发电站') or [])
+    cur_pw = list(cur) if cur_room == '发电站' else []
+    other_pw = [o for o in pw_all if o not in cur_pw]
+    fac_bonus = collections.Counter()
+    if where('森蚺', '控制中枢') and 'Lancet-2' in pw_all:
+        fac_bonus['发电站'] += 2
+    if '承曦格雷伊' in (cur_pw or pw_all):
+        try:
+            from .rules import _members_of as _mo
+            plat = set(_mo(ds, '作业平台'))
+        except Exception:
+            plat = set()
+        if not (plat & set(other_pw)):
+            fac_bonus['发电站'] += 1
+    ctx.fac_bonus = dict(fac_bonus)
+    # ---- 工程机器人（至简·绘图设计）：基建内除活动室外每间设施每级 +1，上限 64 ----
+    bots = 0
+    if where('至简', '制造站'):
+        bots = sum(int(lv or 3) for room, insts in (ctx.layout or {}).items()
+                   for (lv, _p) in insts)
+        bots = min(64, bots)
     r.update(感知信息=siwei, 思维链环=silian, 无声共鸣=wusheng, 人间烟火=yanhuo,
              巫术结晶=(int(yanhuo // 5) if where('截云', '制造站') else 0),
+             工程机器人=float(bots),
              魔物料理=(5.0 if where('森西', '宿舍') else 0.0))
     return r
 
