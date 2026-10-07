@@ -84,6 +84,24 @@ def revenue(ds, room, team, product=None, by_room=None, hours=1.0, layout=None):
 
 
 # ---------------------------------------------------------------- 语义扫描
+def zero_survivors(ds, box, room):
+    """**能在归零房里活下来的人**：技能效果不是"订单获取效率+X%"/"生产力+X%"，
+    而是分布(裁缝/卡夫卡)、按单加钱(龙舌兰·投资)、订单上限、特别订单(可露希尔)、
+    违约(但书)、按设施/资源/仓库容量给加成的人 —— 他们才配进巫恋/温蒂/森蚺的房间。"""
+    KEEP = (r'高品质|裁缝|手工艺品|鉴定师|投资|订单上限|特别订单|违约索赔|合同法|'
+            r'每格仓库容量|仓库容量上限|工程机器人|每个发电站|每个贸易站|每条赤金生产线|'
+            r'每间宿舍每级|思维链环|感知信息|无声共鸣|人间烟火|协同|配合')
+    out = []
+    for s in ds.skills:
+        if s.room != room:
+            continue
+        if re.search(KEEP, s.desc or ''):
+            for h in s.holders:
+                if box.get(h, {}).get('own') and h not in out:
+                    out.append(h)
+    return out
+
+
 def find(ds, box, pattern, room=None, owned_only=True):
     """技能原文匹配 pattern 的干员（可限定房间）；owned_only=只看已持有"""
     out = []
@@ -107,7 +125,27 @@ def term_members(ds, term):
         return []
 
 
-# ---------------------------------------------------------------- 体系原型
+# 外部补强：**其他房间的人对本配队的加成**（要塞进该体系的账面，否则会低估）
+SUPPORTS = {
+    '归零制造（温蒂/森蚺）': {'控制中枢': ['森蚺', '阿米娅'], '发电站': ['Lancet-2', '承曦格雷伊'],
+                          'note': '发电站数量修正直接乘在"每个发电站+X%"上：晨曦 +1、森蚺(中枢)+Lancet-2 +2；'
+                                  '此时其他发电站不能放作业平台，否则晨曦失效'},
+    '归零贸易（巫恋高品质）': {'控制中枢': ['阿米娅', '明椒'],
+                          'note': '中枢"所有贸易站订单效率 +7%"（取最高）'},
+    '感知信息链（迷迭香+黑键）': {'宿舍': ['爱丽丝', '车尔尼', '塑心'], '人力办公室': ['絮雨'],
+                              '控制中枢': ['夕'],
+                              'note': '宿舍满员 20 人 + 感知信息提供者（爱丽丝/车尔尼/塑心/絮雨/夕）'},
+    '人间烟火（乌有）': {'控制中枢': ['夕', '令'], 'note': '夕心情<12 给烟火 15 点；宿舍满员'},
+    '孑差额订单': {'控制中枢': ['灵知'],
+                 'note': '灵知：每个进驻贸易站的谢拉格干员 → 订单上限 +6、订单效率 −15%'
+                         '（上限进孑的差额乘区，效率是代价）'},
+    '但书违约 / 可露希尔特别订单': {'控制中枢': ['阿米娅', '明椒'], 'note': '中枢 +7% 贸易效率'},
+    '中枢贸易增益（阿米娅/诗怀雅/明椒）': {'贸易站': ['德克萨斯', '能天使', '拉普兰德'],
+                                   'note': '中枢加成的价值 = 加成% × 前三贸易站币/时（见折算口径）'},
+    '仓库体系（红云/泡泡）': {'note': '容量同时给"生产力"与"防爆仓余量"（见 爆仓余量 列）'},
+    '至简工程机器人': {'note': '机器人 = 全基建设施总等级（本模型 47），与房间等级无关'},
+    '发电充能（澄闪/深靛/伊芙利特…）': {'控制中枢': ['逻各斯'], 'note': 'PhonoR-0 需逻各斯在中枢再 +5%'},
+}
 def archetypes():
     """每条 = 一个体系原型（成员按语义扫描，不写死）"""
     A = []
@@ -115,7 +153,8 @@ def archetypes():
         name='归零制造（温蒂/森蚺）', room='制造站', product='Pure Gold', mech='归零独占+设施计数',
         need=3, knobs=('发电站数量', '晨曦+1', '森蚺中枢Lancet-2+2'),
         want=lambda ds, box: (find(ds, box, r'其他干员提供的生产力全部归零', '制造站')
-                              + ['清流'] + ['承曦格雷伊', 'Lancet-2']),
+                              + zero_survivors(ds, box, '制造站')
+                              + ['承曦格雷伊', 'Lancet-2', '清流']),
         core=lambda ds, box: [o for o in ('温蒂', '森蚺', '清流') if box.get(o, {}).get('own')],
         subs='替补必须是"不受归零影响"的：按设施数量(清流/温蒂自身)/资源/仓库容量给加成的干员；'
              '绝不能用普通效率干员（会被归零）',
@@ -169,7 +208,8 @@ def archetypes():
     A.append(dict(
         name='孑差额订单', room='贸易站', product='LMD', mech='订单上限联动',
         need=3, knobs=(),
-        want=lambda ds, box: (['孑'] + find(ds, box, r'订单上限\+\d+', '贸易站') + ['灵知', '银灰', '初雪']),
+        want=lambda ds, box: (['孑'] + find(ds, box, r'订单上限\+\d+', '贸易站')
+                              + ['灵知', '银灰', '初雪', '拉普兰德', '崖心', '角峰', '可颂', '拜松']),
         core=lambda ds, box: [o for o in ('孑',) if box.get(o, {}).get('own')],
         subs='孑 E0（摊贩经济：每差 1 笔 +4%，靠上限拉开差额）与孑 E1+（市井之道：每笔订单 +4%，'
              '但每 10% 队友效率扣 1 上限）是**两套完全不同**的配队 ⇒ 替补池也不同',
@@ -314,6 +354,26 @@ def evaluate(ds, box, layout=None):
             continue
         val, metric, note = revenue(ds, A['room'], team, A['product'],
                                     by_room={A['room']: team}, layout=layout)
+        # —— 外部补强：把本体系假设的"其他房间的人"算进账面，并给出补强增益 ——
+        sup = SUPPORTS.get(A['name'], {})
+        by_with = {A['room']: team}
+        for rm, ops in sup.items():
+            if rm == 'note':
+                continue
+            by_with[rm] = [o for o in ops if box.get(o, {}).get('own')]
+        v_with, _m2, _n2 = revenue(ds, A['room'], team, A['product'], by_room=by_with, layout=layout)
+        support_gain = (v_with / val - 1) if val else 0.0
+        val = v_with                       # 满配收益 = **含补强**
+        # —— 制造站：红云/稀音这类"容量"同时是生产力与**防爆仓余量** ——
+        overflow_h = None
+        if A['room'] == '制造站' and val > 0:
+            try:
+                from core import storage as _ST
+                vol = _ST.VOLUME.get(A['product'], 2)
+                cap_items = _ST.CAPACITY.get(3, 54) / float(vol)
+                overflow_h = round(cap_items / val, 1)      # 不收取时多久会满仓
+            except Exception:
+                overflow_h = None
         loo, removable = [], [o for o in team if o in core] or list(team)
         for op in removable:
             rest = [o for o in team if o != op]
@@ -335,6 +395,8 @@ def evaluate(ds, box, layout=None):
                          note={k: (round(v, 3) if isinstance(v, (int, float)) else v)
                                for k, v in note.items()},
                          leave_one_out=loo, robustness=round(robust, 3),
+                         supports={k: v for k, v in sup.items() if k != 'note'},
+                         support_gain=round(support_gain, 3), overflow_h=overflow_h,
                          subs=A['subs'], knobs=list(A['knobs']), comments=A['notes']))
     # **支撑型体系**（中枢加成 / 宿舍心情）：它们的价值体现在"别人"身上，
     # 用**显式折算公式**换成等值币/时，才谈得上和产出型一起排权重：
@@ -383,22 +445,36 @@ def markdown(rows, extra_sections=()):
          '> **权重 = （同房间归一化满配收益）×（留一法稳健度）**；稳健度 = 缺任一必需成员并用机制替补后，',
          '> 收益/满配收益的最小值。档位 S≥0.75 / A≥0.5 / B≥0.25 / C<0.25。', '']
     L += ['## 一、体系权重总表', '',
-          '| 档 | 权重 | 房间 | 体系 | 满配编队 | 满配收益 | 稳健度 | 最痛缺口 | 替补规则 |',
-          '|---|---|---|---|---|---|---|---|---|']
+          '| 档 | 权重 | 房间 | 体系 | 满配编队（含外部补强假设） | 满配收益 | 补强增益 | 防爆仓余量 | 稳健度 | 最痛缺口 |',
+          '|---|---|---|---|---|---|---|---|---|---|']
     for r in rows:
-        pain = ''
+        pain = '—'
         if r['leave_one_out']:
             w = min(r['leave_one_out'], key=lambda x: x['rest'])
             pain = f"{w['op']}（{w['drop_pct']:+.0f}%）"
-        L.append(f"| {r['tier']} | {r['weight']:.2f} | {r['room']} | {r['name']} | "
-                 f"{'+'.join(r['team'])} | {r['value']}{r['metric']} | {r['robustness']:.2f} | {pain} | "
-                 f"{r['subs'][:60]} |")
+        gain = r.get('support_gain') or 0.0
+        gain_s = f'{gain * 100:+.0f}%' if gain else '—'
+        ov = r.get('overflow_h')
+        ov_s = f'{ov:g}h' if ov else '—'
+        L.append('| {} | {:.2f} | {} | {} | {} | {}{} | {} | {} | {:.2f} | {} |'.format(
+            r['tier'], r['weight'], r['room'], r['name'], '+'.join(r['team']),
+            r['value'], r['metric'], gain_s, ov_s, r['robustness'], pain))
     L += ['', '## 二、逐体系明细（机制 / 参数 / 缺人曲线 / 注释）', '']
     for r in rows:
-        L.append(f"### [{r['tier']}] {r['name']}（{r['room']}，需 {r['need']} 人，权重 {r['weight']:.2f}）")
+        L.append('### [{}] {}（{}，需 {} 人，权重 {:.2f}）'.format(
+            r['tier'], r['name'], r['room'], r['need'], r['weight']))
         L.append(f"- 机制：{r['mech']}；布局/参数：{'、'.join(r['knobs']) or '无'}")
         L.append(f"- 满配编队：{'+'.join(r['team'])} → {r['value']}{r['metric']}"
                  + (f"（{r['note']}）" if r['note'] else ''))
+        if r.get('supports'):
+            L.append('- **外部补强（别的房间的人，已计入上面的收益）**：' +
+                     '；'.join(f"{rm}→{'+'.join(ops)}" for rm, ops in r['supports'].items()))
+            L.append(f"  - 补强增益：{(r.get('support_gain') or 0) * 100:+.0f}%"
+                     + (f"；{SUPPORTS.get(r['name'], {}).get('note', '')}"
+                        if SUPPORTS.get(r['name'], {}).get('note') else ''))
+        if r.get('overflow_h'):
+            L.append(f"- **防爆仓余量**：不收取时 {r['overflow_h']:g}h 后满仓（容量 Lv3=54 ÷ 体积）"
+                     f"——红云/稀音这类仓库系的价值一半在这里")
         L.append(f"- 候选池（已持有，按单人收益排序）：{'、'.join(r['candidates']) or '—'}")
         if r['missing']:
             L.append(f"- ⚠ 你缺：{'、'.join(r['missing'])}")

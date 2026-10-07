@@ -92,6 +92,12 @@ RULES = [
          chan='order', expr='res("无声共鸣")/2'),
     dict(id='mowu', room='贸易站', re=r'每1点魔物料理\+(\d+)%订单效率',
          chan='order', expr='res("魔物料理")*g1'),
+    # ---- 订单上限 / 差额订单（孑）与灵知（中枢·谢拉格包）----
+    #   Lv3 订单上限基础 10（orders.ORDER_CAP），孑按"上限 − 在手订单"每条差 +4%
+    dict(id='tanfan_e0', room='贸易站', re=r'当前订单数与订单上限每差1笔订单，则订单获取效率\+(\d+)%',
+         chan='order', expr='g1*(res("订单上限") - res("在手订单"))'),
+    dict(id='shijing_e1', room='贸易站', re=r'每有1笔订单就\+(\d+)%订单获取效率',
+         chan='order', expr='g1*res("在手订单")'),
     dict(id='goldline_per_n', room='贸易站',
          re=r'每有(\d+)条赤金生产线，则当前贸易站订单获取效率额外\+(\d+)%',
          chan='order', expr='int(res("赤金生产线")//g1)*g2'),
@@ -323,6 +329,11 @@ def _external_eff(room, ctx, ds, product, res):
                     ext += 7.0
                 if '实地' in d and room == '制造站' and res.get('实地', 0) > res.get('外势', 0):
                     ext += 2.0
+    # 灵知（控制中枢）：每个进驻在贸易站的**谢拉格**干员 → 贸易站订单效率 −15%（换订单上限 +6）
+    if room == '贸易站' and '灵知' in (by_room.get('控制中枢') or []):
+        xl = _members_of(ds, '谢拉格')
+        n = sum(1 for o in (by_room.get('贸易站') or []) if o in xl)
+        ext -= 15.0 * n
     cache[key] = ext
     return ext
 

@@ -287,6 +287,25 @@ def _resolve_resources(ctx, team, res, ds, cur_room=None, cur_team=None):
         if not (plat & set(other_pw)):
             fac_bonus['发电站'] += 1
     ctx.fac_bonus = dict(fac_bonus)
+    # ---- 订单上限（Lv3 基础 10）+ 技能 + 灵知 ----
+    #   孑的"差额订单"、银灰/拉普兰德的上限、灵知(中枢)的谢拉格包都作用在这里。
+    from . import orders as _OD
+    trade_levels = [int(lv or 3) for (lv, _p) in (ctx.layout or {}).get('贸易站', [])] or [3]
+    cap = float(max(_OD.ORDER_CAP.get(l, 10) for l in trade_levels))
+    trade_ops = list(by_room.get('贸易站') or []) or (list(cur) if cur_room == '贸易站' else [])
+    for op in trade_ops:
+        for s in ds.skills_of(op, '贸易站'):
+            for m0 in re.finditer(r'订单上限\+(\d+)', s.desc or ''):
+                cap += float(m0.group(1))
+    if where('灵知', '控制中枢'):
+        try:
+            from .rules import _members_of as _mo
+            xl = set(_mo(ds, '谢拉格'))
+        except Exception:
+            xl = {'银灰', '初雪', '角峰', '崖心', '史尔特尔'}
+        cap += 6.0 * sum(1 for o in trade_ops if o in xl)
+    r['订单上限'] = cap
+    r['在手订单'] = float(_OD.IN_HAND)
     # ---- 工程机器人（至简·绘图设计）：基建内除活动室外每间设施每级 +1，上限 64 ----
     bots = 0
     if where('至简', '制造站'):

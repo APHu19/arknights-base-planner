@@ -28,6 +28,11 @@
     ✅ 校验：违约索赔·β 时 6.64 币/效率点·h、0.01327 赤金/效率点·h
 """
 ORDERS = [(2, 1000, 8640), (3, 1500, 12600), (4, 2000, 16560)]
+# **订单上限**（全机制.md 贸易站等级表）：Lv1/2/3 = 6/8/10 —— 孑的"差额订单"全靠它
+ORDER_CAP = {1: 6, 2: 8, 3: 10}
+IN_HAND = 1.0            # 假设：稳态下贸易站手里压着 1 笔订单（自动交付/及时收取）
+# 龙舌兰·投资：**按单结算的独立乘区**（不是效率%）
+INVEST = {'投资·β': 500.0, '投资·α': 250.0}
 BASE_P = (0.30, 0.50, 0.20)
 ALPHA_P = (0.15, 0.30, 0.55)
 BETA_P = (0.05, 0.10, 0.85)
@@ -90,30 +95,46 @@ def probabilities(team, ds, hours=12.0):
     return probs, tag, f'{tag}，慢热 {w*100:.0f}%（{ramp:g}h 满档）'
 
 
-def profile(team, ds, hours=12.0):
+def profile(team, ds, hours=12.0, cap=None, level=3):
+    """把一支贸易站队伍翻译成**订单的每单分解 + 每天/每小时的收益**。
+
+    返回里现在显式拆开三个乘区（这是用户要求的口径）：
+      · **订单速率**：`hours_per_order` 来自"品质分布 × 基础耗时"，受效率影响（eff 用 lmd_per_eff_hour 体现）
+      · **每单币/赤金**：`lmd_per_order / gold_per_order`（含**违约索赔**改写、**龙舌兰·投资**加钱）
+      · **订单上限**：`cap`（Lv3 基础 10 + 技能；孑的差额、银灰/拉普兰德/灵知都作用在这里）
+    """
     probs, tag, ramp_note = probabilities(team, ds, hours)
     breach = None
+    invest = 0.0
     for op in team:
         for s in ds.skills_of(op, '贸易站'):
             for name, extra in BREACH.items():
-                if (s.name or '') == name and (breach is None or extra > BREACH.get(breach, 0)):
+                if (s.name or '') == name and (extra > BREACH.get(breach or '', 0)):
                     breach = name
+            for name, money in INVEST.items():
+                if (s.name or '') == name:
+                    invest = max(invest, money)
     extra = BREACH.get(breach, 0)
     rows = []
     for (gold, lmd, secs), p in zip(ORDERS, probs):
         g, l = gold, lmd
-        if extra and gold < 4:
+        if extra and gold < 4:                    # 但书·违约索赔：赤金交付 +N，龙门币同比例
             g = gold + extra
-            l = lmd * g / gold                    # 按实际交付赤金同比例
+            l = lmd * g / gold
+        if invest and gold > 3:                   # 龙舌兰·投资：该笔订单 >3 赤金 → 直接加钱
+            l = l + invest
         rows.append((g, l, secs, p))
     gold_exp = sum(g * p for g, l, s, p in rows)
     lmd_exp = sum(l * p for g, l, s, p in rows)
     sec_exp = sum(s * p for g, l, s, p in rows)
     hours_exp = sec_exp / 3600.0
+    cap = float(ORDER_CAP.get(int(level or 3), 10) if cap is None else cap)
     return dict(
         lmd_per_eff_hour=lmd_exp / hours_exp / 100.0,
         gold_cost_per_eff_hour=gold_exp / hours_exp / 100.0,
         gold_per_order=gold_exp, lmd_per_order=lmd_exp, hours_per_order=hours_exp,
         lmd_per_gold=(lmd_exp / gold_exp if gold_exp else 0.0),
-        probs=probs, quality=tag, ramp=ramp_note, breach=breach,
+        probs=probs, quality=tag, ramp=ramp_note, breach=breach, invest=(invest or 0.0),
+        cap=cap, in_hand=IN_HAND, gap=(cap - IN_HAND),
+        per_order=[dict(gold=g, lmd=l, secs=s, p=p) for g, l, s, p in rows],
         quality_skills=_quality_skills(team, ds))
